@@ -1,0 +1,843 @@
+module Page.Racing exposing (applyGps, update, view)
+
+{-| The screen a runner actually looks at, mid-race, tired, one handed.
+
+Four numbers and nothing else: how far to the next checkpoint, how much climb
+and descent to get there, and how long until it closes.
+
+-}
+
+import Action exposing (Msg(..), RacingMsg(..))
+import Core.App.Checkpoint as Checkpoint exposing (Checkpoint)
+import Core.App.Km as Km exposing (Km)
+import Core.App.LatLon as LatLon
+import Core.App.Plan as Plan
+import Core.App.Position as Position exposing (Candidate, Resolution(..), RouteState(..))
+import Core.App.Progress as Progress exposing (Fix, Source(..))
+import Core.App.Route as Route
+import Core.App.Segment as Segment exposing (Segment, Urgency(..))
+import Core.App.Sos as Sos
+import Core.Data.Distance as Distance
+import Core.Data.Duration as Duration
+import Core.Data.Elevation as Elevation
+import Core.Data.NonEmpty as NonEmpty
+import Html exposing (Html, div, text)
+import Html.Attributes exposing (class, classList)
+import Html.Events exposing (onClick)
+import Runtime.Ports as Ports
+import State exposing (Dialog(..), Model, RaceState, Screen(..), Scrub(..), Tab(..))
+import Time
+import View.Form as Form
+import View.Map as Map
+import View.Pointer as Pointer
+import View.Profile as Profile
+import View.Theme as Theme
+
+
+
+-- UPDATE
+
+
+update : RacingMsg -> RaceState -> Model -> ( Model, Cmd Msg )
+update msg race model =
+    case msg of
+        SwitchTab wantsPlan ->
+            ( put
+                { race
+                    | tab =
+                        if wantsPlan then
+                            PlanTab
+
+                        else
+                            LocateTab
+                }
+                model
+            , Cmd.none
+            )
+
+        RequestGps ->
+            ( model, Ports.requestGps () )
+
+        ChoosePosition candidate ->
+            ( { model | dialog = Nothing }
+                |> put (acceptCandidate candidate race)
+            , Cmd.none
+            )
+
+        KeepPosition ->
+            ( { model | dialog = Nothing }, Cmd.none )
+
+        ToggleKmEntry ->
+            ( put { race | kmEntryOpen = not race.kmEntryOpen } model, Cmd.none )
+
+        EditKmEntry raw ->
+            ( put { race | kmEntryText = raw } model, Cmd.none )
+
+        SubmitKmEntry ->
+            case String.toFloat race.kmEntryText of
+                Nothing ->
+                    ( notify "Nhập một số km hợp lệ." model, Cmd.none )
+
+                Just value ->
+                    ( declarePosition (Km.fromFloat value) race model, Cmd.none )
+
+        ScrubProfile offsetX elementWidth ->
+            ( put
+                { race
+                    | scrub =
+                        ScrubbingAt
+                            (Profile.kmAtFraction (Plan.route race.plan)
+                                (offsetX / Basics.max 1 elementWidth)
+                            )
+                }
+                model
+            , Cmd.none
+            )
+
+        MapPointerDown id at ->
+            ( put { race | gesture = State.pointerDown id at race.map race.gesture } model
+            , Cmd.none
+            )
+
+        MapPointerMove id at renderedWidth ->
+            let
+                ( gesture, map ) =
+                    State.pointerMove (Plan.route race.plan)
+                        (Map.unitsPerPixel renderedWidth)
+                        id
+                        at
+                        ( race.gesture, race.map )
+            in
+            ( put { race | gesture = gesture, map = map } model, Cmd.none )
+
+        MapPointerUp id ->
+            ( put { race | gesture = State.pointerUp id race.gesture } model, Cmd.none )
+
+        MapWheel deltaY ->
+            ( put
+                { race
+                    | map =
+                        State.zoomBy
+                            (if deltaY < 0 then
+                                1.15
+
+                             else
+                                1 / 1.15
+                            )
+                            (Plan.route race.plan)
+                            race.map
+                }
+                model
+            , Cmd.none
+            )
+
+        ViewMe ->
+            ( put
+                { race
+                    | scrub = NotScrubbing
+                    , map =
+                        State.fitTo
+                            (Route.atKm (Plan.route race.plan) (Progress.km race.progress)).plane
+                }
+                model
+            , Cmd.none
+            )
+
+        ViewWhole ->
+            ( put { race | map = State.fitAll (Plan.route race.plan) } model, Cmd.none )
+
+        EditPhone raw ->
+            ( { model | sosPhone = raw }, Cmd.none )
+
+        SendSos ->
+            case ( Progress.lastFix race.progress, String.trim model.sosPhone ) of
+                ( Nothing, _ ) ->
+                    ( notify "Chưa có toạ độ — bấm Lấy GPS trước." model, Cmd.none )
+
+                ( _, "" ) ->
+                    ( notify "Nhập số điện thoại người nhận trước." model, Cmd.none )
+
+                ( Just fix, phone ) ->
+                    ( model
+                    , Ports.openSms
+                        { phone = phone
+                        , body = Sos.message model.zone fix (Just (Progress.km race.progress))
+                        }
+                    )
+
+        CopySos ->
+            case Progress.lastFix race.progress of
+                Nothing ->
+                    ( notify "Chưa có toạ độ — bấm Lấy GPS trước." model, Cmd.none )
+
+                Just fix ->
+                    ( notify "Đã chép nội dung tin." model
+                    , Ports.copyText (Sos.message model.zone fix (Just (Progress.km race.progress)))
+                    )
+
+        OpenPlanEditor ->
+            ( { model | screen = Setting (State.setup (Plan.toDraft race.plan 1000)) }, Cmd.none )
+
+        RequestQuit ->
+            ( { model | dialog = Just ConfirmQuit }, Cmd.none )
+
+        QuitToSetup ->
+            ( { model
+                | dialog = Nothing
+                , screen = Setting (State.setup (Plan.toDraft race.plan 1000))
+              }
+            , Cmd.none
+            )
+
+        QuitAndErase ->
+            ( { model | dialog = Nothing, screen = Setting (State.setup Plan.emptyDraft) }
+            , Ports.clear ()
+            )
+
+
+put : RaceState -> Model -> Model
+put race model =
+    { model | screen = Racing race }
+
+
+notify : String -> Model -> Model
+notify content model =
+    { model | toast = Just { text = content, shownAt = model.now } }
+
+
+{-| A distance the runner types is a decision, and it overrides the displayed
+position too. Leaving the old dot on the map would make the next fix compare
+itself against a place the runner is no longer standing.
+-}
+declarePosition : Km -> RaceState -> Model -> Model
+declarePosition reached race model =
+    let
+        moved =
+            Progress.fromRunner reached model.now race.progress
+
+        undone =
+            NonEmpty.filterToList
+                (\checkpoint ->
+                    Checkpoint.isPassed checkpoint && not (Km.isAtOrBefore reached checkpoint.km)
+                )
+                (Plan.checkpoints race.plan)
+    in
+    put
+        { race
+            | progress = moved
+            , plan = syncPlan reached model.now race.plan
+            , kmEntryOpen = False
+            , map = State.fitTo (Route.atKm (Plan.route race.plan) reached).plane
+        }
+        (notify
+            ("Đã đặt lại về km "
+                ++ Km.toString reached
+                ++ (if List.isEmpty undone then
+                        ""
+
+                    else
+                        " · "
+                            ++ String.fromInt (List.length undone)
+                            ++ " trạm trở lại chưa qua"
+                   )
+            )
+            model
+        )
+
+
+syncPlan : Km -> Time.Posix -> Plan.Plan -> Plan.Plan
+syncPlan reached now plan =
+    Plan.withCheckpoints
+        (NonEmpty.map (Checkpoint.syncStatus reached now) (Plan.checkpoints plan))
+        plan
+
+
+{-| One fix answers two separate questions, so it is resolved into two separate
+candidates and each is used for exactly one thing.
+-}
+applyGps : Fix -> RaceState -> Model -> ( Model, Cmd Msg )
+applyGps fix race model =
+    case Position.resolve (Plan.route race.plan) (Just race.startedAt) race.progress fix of
+        Nothing ->
+            ( notify "Không đối chiếu được với đường chạy." model, Cmd.none )
+
+        Just (Ambiguous details) ->
+            ( { model | dialog = Just (PickPosition details.options) }, Cmd.none )
+
+        Just (Resolved details) ->
+            ( put (acceptResolution details.progress details.nearest fix race) model
+            , Cmd.none
+            )
+
+
+acceptCandidate : Candidate -> RaceState -> RaceState
+acceptCandidate candidate race =
+    case Progress.lastFix race.progress of
+        Nothing ->
+            race
+
+        Just fix ->
+            acceptResolution candidate candidate fix race
+
+
+acceptResolution : Candidate -> Candidate -> Fix -> RaceState -> RaceState
+acceptResolution forProgress forGuidance fix race =
+    let
+        state =
+            Position.routeState fix forGuidance
+
+        deviation =
+            Position.candidateDeviation forGuidance
+
+        trustworthy =
+            Distance.inMeters deviation
+                <= 250
+                && Distance.inMeters fix.accuracy
+                <= 100
+
+        reached =
+            if trustworthy then
+                Position.candidateKm forProgress
+
+            else
+                Progress.km race.progress
+    in
+    { race
+        | progress = Progress.fromGps reached fix (state == OnRoute) race.progress
+        , plan = syncPlan reached fix.taken race.plan
+        , tab =
+            if state == OnRoute then
+                race.tab
+
+            else
+                LocateTab
+    }
+
+
+
+-- VIEW
+
+
+view : Model -> RaceState -> Html Msg
+view model race =
+    let
+        reached =
+            Progress.km race.progress
+    in
+    div []
+        [ tabs race
+        , case race.tab of
+            PlanTab ->
+                planPanel model race reached
+
+            LocateTab ->
+                locatePanel race
+        , dock race
+        , footerButtons
+        , sosPanel model race
+        ]
+
+
+tabs : RaceState -> Html Msg
+tabs race =
+    div [ class "tabs" ]
+        [ Html.button
+            [ classList [ ( "on", race.tab == PlanTab ) ]
+            , onClick (RacingChanged (SwitchTab True))
+            ]
+            [ text "Kế hoạch" ]
+        , Html.button
+            [ classList [ ( "on", race.tab == LocateTab ) ]
+            , onClick (RacingChanged (SwitchTab False))
+            ]
+            [ text "Định vị" ]
+        ]
+
+
+planPanel : Model -> RaceState -> Km -> Html Msg
+planPanel model race reached =
+    div []
+        [ nextCard model race reached
+        , ledger model race reached
+        ]
+
+
+cursorKm : RaceState -> Maybe Km
+cursorKm race =
+    case race.scrub of
+        NotScrubbing ->
+            Nothing
+
+        ScrubbingAt km ->
+            Just km
+
+
+nextCard : Model -> RaceState -> Km -> Html Msg
+nextCard model race reached =
+    case Plan.nextAhead reached race.plan of
+        Nothing ->
+            Theme.card []
+                [ div [ class "lead-top" ]
+                    [ Theme.eyebrow "Trạm tiếp theo"
+                    , div [ class "lead-name" ] [ text "Đã qua trạm cuối" ]
+                    , div [ class "lead-dist" ] [ text "Chúc mừng bạn về đích" ]
+                    ]
+                ]
+
+        Just checkpoint ->
+            let
+                segment =
+                    Segment.toCheckpoint model.zone race.plan reached model.now checkpoint
+
+                borrowed =
+                    case segment.cutoff of
+                        Just _ ->
+                            Nothing
+
+                        Nothing ->
+                            Segment.deadline model.zone race.plan reached model.now
+
+                shownCutoff =
+                    case ( segment.cutoff, borrowed ) of
+                        ( Just moment, _ ) ->
+                            Just moment
+
+                        ( Nothing, Just ( _, moment ) ) ->
+                            Just moment
+
+                        _ ->
+                            Nothing
+            in
+            Theme.card []
+                [ div [ class "lead-top" ]
+                    [ Theme.eyebrow "Trạm tiếp theo"
+                    , div [ class "lead-name" ] [ text (Checkpoint.displayName checkpoint) ]
+                    , div [ class "lead-dist" ]
+                        [ text
+                            ("trạm ở km "
+                                ++ Km.toString checkpoint.km
+                                ++ " · bạn đang ở km "
+                                ++ Km.toString reached
+                            )
+                        ]
+                    ]
+                , div [ class "quad" ]
+                    [ Theme.quadCell "Còn lại" (Km.toString (Km.fromFloat (Distance.inKilometers segment.distance))) "km"
+                    , Theme.quadCell "Leo lên" (String.fromInt (Elevation.inWholeMeters segment.ascent)) "m"
+                    , Theme.quadCell "Xuống dốc" (String.fromInt (Elevation.inWholeMeters segment.descent)) "m"
+                    , Theme.quadCell (cutoffLabel borrowed)
+                        (case shownCutoff of
+                            Nothing ->
+                                "–"
+
+                            Just moment ->
+                                Duration.toCompactString moment.remaining
+                        )
+                        ""
+                    ]
+                , cutoffVerdict model borrowed segment shownCutoff
+                ]
+
+
+cutoffLabel : Maybe ( Checkpoint, Segment.CutoffMoment ) -> String
+cutoffLabel borrowed =
+    case borrowed of
+        Nothing ->
+            "Tới giờ đóng trạm"
+
+        Just ( checkpoint, _ ) ->
+            "Tới COT · " ++ Checkpoint.displayName checkpoint
+
+
+cutoffVerdict : Model -> Maybe ( Checkpoint, Segment.CutoffMoment ) -> Segment -> Maybe Segment.CutoffMoment -> Html Msg
+cutoffVerdict model borrowed segment shownCutoff =
+    case ( borrowed, shownCutoff ) of
+        ( Just ( checkpoint, moment ), _ ) ->
+            Theme.verdict (urgencyOf moment)
+                "Trạm này không có giờ đóng trạm"
+                (Just
+                    ("Mốc gần nhất là "
+                        ++ Checkpoint.displayName checkpoint
+                        ++ " ở km "
+                        ++ Km.toString checkpoint.km
+                        ++ ", đóng lúc "
+                        ++ clockOf model moment.closesAt
+                    )
+                )
+
+        ( Nothing, Just moment ) ->
+            if Duration.isNegative moment.remaining then
+                Theme.verdict Missed ("Đã quá giờ đóng trạm " ++ clockOf model moment.closesAt) Nothing
+
+            else
+                Theme.verdict (Segment.urgency segment)
+                    ("Đóng trạm lúc " ++ clockOf model moment.closesAt)
+                    Nothing
+
+        _ ->
+            Theme.verdict NoDeadline "Phía trước không còn trạm nào có giờ đóng trạm" Nothing
+
+
+urgencyOf : Segment.CutoffMoment -> Urgency
+urgencyOf moment =
+    if Duration.isNegative moment.remaining then
+        Missed
+
+    else if Duration.inMinutes moment.remaining < 30 then
+        Tight
+
+    else
+        Comfortable
+
+
+clockOf : Model -> Time.Posix -> String
+clockOf model moment =
+    pad (Time.toHour model.zone moment) ++ ":" ++ pad (Time.toMinute model.zone moment)
+
+
+pad : Int -> String
+pad value =
+    String.padLeft 2 '0' (String.fromInt value)
+
+
+scrubReadout : RaceState -> String
+scrubReadout race =
+    case race.scrub of
+        NotScrubbing ->
+            "Chạm và rê ngón tay trên biểu đồ để xem dốc phía trước"
+
+        ScrubbingAt km ->
+            Profile.readout (Plan.route race.plan) km
+
+
+ledger : Model -> RaceState -> Km -> Html Msg
+ledger model race reached =
+    div [ class "ledger" ]
+        [ Html.h3 [] [ text "Toàn bộ chặng" ]
+        , div []
+            (NonEmpty.toList (Plan.checkpoints race.plan)
+                |> Checkpoint.sortByKm
+                |> List.map (ledgerRow model race reached)
+            )
+        ]
+
+
+ledgerRow : Model -> RaceState -> Km -> Checkpoint -> Html Msg
+ledgerRow model race reached checkpoint =
+    let
+        segment =
+            Segment.toCheckpoint model.zone race.plan reached model.now checkpoint
+
+        passed =
+            Checkpoint.isPassed checkpoint
+
+        detail =
+            if passed then
+                "km "
+                    ++ Km.toString checkpoint.km
+                    ++ (case Checkpoint.passedAt checkpoint of
+                            Nothing ->
+                                ""
+
+                            Just moment ->
+                                " · qua lúc " ++ clockOf model moment
+                       )
+
+            else
+                "km "
+                    ++ Km.toString checkpoint.km
+                    ++ " · còn "
+                    ++ Km.toString (Km.fromFloat (Distance.inKilometers segment.distance))
+                    ++ " km · ↑"
+                    ++ String.fromInt (Elevation.inWholeMeters segment.ascent)
+                    ++ " ↓"
+                    ++ String.fromInt (Elevation.inWholeMeters segment.descent)
+                    ++ " m"
+    in
+    Theme.ledgerRow
+        [ classList [ ( "passed", passed ) ] ]
+        [ div [ class "body" ]
+            [ div [ class "nm" ] [ text (Checkpoint.displayName checkpoint) ]
+            , div [ class "sub" ] [ text detail ]
+            ]
+        , amountCell model checkpoint segment
+        ]
+
+
+{-| The right hand column. Ahead of the runner it is a countdown to the
+cutoff; behind, it is the margin they actually had when they arrived, which is
+a fixed fact and must not keep drifting with the clock. Both name the cutoff
+time itself, because "2h10 to go" means nothing without "until 12:30".
+-}
+amountCell : Model -> Checkpoint -> Segment -> Html Msg
+amountCell model checkpoint segment =
+    case ( segment.cutoff, Checkpoint.passedAt checkpoint ) of
+        ( Nothing, _ ) ->
+            div [ class "amt flat" ]
+                [ text "—", Html.small [] [ text "không có COT" ] ]
+
+        ( Just moment, Nothing ) ->
+            div [ class ("amt " ++ Theme.urgencyClass (Segment.urgency segment)) ]
+                [ text (Duration.toCompactString moment.remaining)
+                , Html.small [] [ text ("COT " ++ clockOf model moment.closesAt) ]
+                ]
+
+        ( Just moment, Just arrived ) ->
+            let
+                margin =
+                    Duration.between arrived moment.closesAt
+            in
+            div
+                [ class
+                    ("amt "
+                        ++ (if Duration.isNegative margin then
+                                "late"
+
+                            else
+                                "ok"
+                           )
+                    )
+                ]
+                [ text (Duration.toSignedString margin)
+                , Html.small [] [ text ("so với COT " ++ clockOf model moment.closesAt) ]
+                ]
+
+
+locatePanel : RaceState -> Html Msg
+locatePanel race =
+    div []
+        [ guide race
+        , div [ class "map-card" ]
+            [ Map.view
+                (Pointer.wheel (RacingChanged << MapWheel)
+                    :: Pointer.drag
+                        { down = \id at -> RacingChanged (MapPointerDown id at)
+                        , move = \id at w -> RacingChanged (MapPointerMove id at w)
+                        , up = RacingChanged << MapPointerUp
+                        }
+                )
+                { route = Plan.route race.plan
+                , view = race.map
+                , checkpoints = NonEmpty.toList (Plan.checkpoints race.plan)
+                , reached = Progress.km race.progress
+                , fix = Progress.lastFix race.progress
+                , lost = currentState race == OffRoute
+                , uncertain = currentState race == Uncertain
+                , snapTo = Nothing
+                , cursor = cursorKm race
+                , breadcrumbs = List.map .at (Progress.breadcrumbs race.progress)
+                }
+            , div [ class "map-foot" ]
+                [ div [ class "scale" ] [ text Map.gestureHint ]
+                , Form.miniButton "Về vị trí tôi" (RacingChanged ViewMe)
+                , Form.miniButton "Toàn tuyến" (RacingChanged ViewWhole)
+                ]
+            ]
+        , elevationCard race
+        ]
+
+
+{-| The course side on, under the map. Dragging across it moves a cursor on
+both, so the runner can see where a climb ahead actually is on the ground.
+-}
+elevationCard : RaceState -> Html Msg
+elevationCard race =
+    let
+        reached =
+            Progress.km race.progress
+    in
+    div [ class "profile-card" ]
+        [ Profile.view
+            (Pointer.scrub (\x w -> RacingChanged (ScrubProfile x w)))
+            { route = Plan.route race.plan
+            , checkpoints = NonEmpty.toList (Plan.checkpoints race.plan)
+            , you = Just reached
+            , cursor = cursorKm race
+            }
+        , div [ class "profile-legend" ]
+            [ Html.span [] [ text "Xuất phát" ]
+            , Html.span [] [ text ("Bạn ở km " ++ Km.toString reached) ]
+            , Html.span [] [ text ("Về đích km " ++ Km.toString (Route.totalKm (Plan.route race.plan))) ]
+            ]
+        , div [ class "scrub-read", classList [ ( "live", race.scrub /= NotScrubbing ) ] ]
+            [ text (scrubReadout race) ]
+        ]
+
+
+currentState : RaceState -> RouteState
+currentState race =
+    case Progress.source race.progress of
+        FromRunner ->
+            OnRoute
+
+        FromGps fix ->
+            case Position.candidates (Plan.route race.plan) fix.at of
+                nearest :: _ ->
+                    Position.routeState fix nearest
+
+                [] ->
+                    OnRoute
+
+
+guide : RaceState -> Html Msg
+guide race =
+    case Progress.source race.progress of
+        FromRunner ->
+            div [ class "guide on-route" ]
+                [ div [ class "head" ] [ text "VỊ TRÍ DO BẠN TỰ NHẬP" ]
+                , div [ class "detail" ]
+                    [ text
+                        ("Đang lấy mốc km "
+                            ++ Km.toString (Progress.km race.progress)
+                            ++ " trên đường chạy. Bấm Lấy GPS nếu muốn máy tự xác định lại."
+                        )
+                    ]
+                ]
+
+        FromGps fix ->
+            case Position.candidates (Plan.route race.plan) fix.at of
+                [] ->
+                    div [ class "guide" ] [ div [ class "head" ] [ text "Chưa biết bạn ở đâu" ] ]
+
+                nearest :: _ ->
+                    guideFor race fix nearest
+
+
+guideFor : RaceState -> Fix -> Candidate -> Html Msg
+guideFor race fix nearest =
+    let
+        state =
+            Position.routeState fix nearest
+
+        deviation =
+            String.fromInt (Distance.inWholeMeters (Position.candidateDeviation nearest))
+
+        accuracy =
+            " · sai số máy đo ±" ++ String.fromInt (Distance.inWholeMeters fix.accuracy) ++ " m"
+    in
+    case state of
+        OnRoute ->
+            div [ class (Theme.routeStateClass state) ]
+                [ div [ class "head" ] [ text "ĐANG TRÊN ĐƯỜNG CHẠY" ]
+                , div [ class "detail" ]
+                    [ text
+                        ("Cách vệt "
+                            ++ deviation
+                            ++ " m, ở khoảng km "
+                            ++ Km.toString (Progress.km race.progress)
+                            ++ accuracy
+                            ++ ". Cứ đi tiếp."
+                        )
+                    ]
+                ]
+
+        Uncertain ->
+            div [ class (Theme.routeStateClass state) ]
+                [ div [ class "head" ] [ text "CHƯA KẾT LUẬN ĐƯỢC" ]
+                , div [ class "detail" ]
+                    [ text
+                        ("Máy báo cách vệt "
+                            ++ deviation
+                            ++ " m"
+                            ++ accuracy
+                            ++ " — độ lệch còn nằm trong sai số, nên có thể bạn vẫn đang trên đường chạy."
+                        )
+                    ]
+                , Html.ol []
+                    [ Html.li [] [ text "Đứng yên tại chỗ, tránh chỗ có tán cây dày hoặc vách đá che." ]
+                    , Html.li [] [ text "Bấm Lấy GPS lại sau vài chục giây để máy bắt tín hiệu tốt hơn." ]
+                    , Html.li [] [ text "Trong lúc chờ, nhìn quanh tìm dấu ruy băng của BTC." ]
+                    ]
+                ]
+
+        OffRoute ->
+            let
+                heading =
+                    LatLon.bearing fix.at (Position.candidateSnap nearest)
+
+                direction =
+                    LatLon.compass heading
+
+                backKm =
+                    Position.candidateKm nearest
+
+                behind =
+                    Km.isBefore (Progress.km race.progress) backKm
+            in
+            div [ class (Theme.routeStateClass state) ]
+                [ div [ class "head" ] [ text ("BẠN ĐÃ RỜI ĐƯỜNG CHẠY " ++ deviation ++ " M") ]
+                , Html.span [ class "arrow" ] [ text (LatLon.compassArrow direction) ]
+                , div [ class "detail" ]
+                    [ text
+                        ("Đi hướng "
+                            ++ LatLon.compassLabel direction
+                            ++ " ("
+                            ++ String.fromInt (LatLon.bearingDegrees heading)
+                            ++ "°) khoảng "
+                            ++ deviation
+                            ++ " m để về vệt tại km "
+                            ++ Km.toString backKm
+                            ++ "."
+                            ++ (if behind then
+                                    " Điểm này nằm ở đoạn bạn đã đi qua — về tới nơi thì đi xuôi trở lại."
+
+                                else
+                                    ""
+                               )
+                        )
+                    ]
+                ]
+
+
+dock : RaceState -> Html Msg
+dock race =
+    div [ class "dock" ]
+        [ div [ class "hint" ] [ text "App chỉ đọc GPS khi bạn bấm — không chạy nền, không hao pin." ]
+        , Form.pair
+            [ Form.tallButton "Lấy GPS" (RacingChanged RequestGps)
+            , Html.button
+                [ class "btn tall", onClick (RacingChanged ToggleKmEntry) ]
+                [ text "Nhập số km" ]
+            ]
+        , if race.kmEntryOpen then
+            div [ class "km-entry" ]
+                [ Form.numberField "Đã chạy bao nhiêu km?" race.kmEntryText (RacingChanged << EditKmEntry)
+                , Form.solidButton "Cập nhật" (RacingChanged SubmitKmEntry)
+                ]
+
+          else
+            text ""
+        ]
+
+
+footerButtons : Html Msg
+footerButtons =
+    div [ class "step" ]
+        [ Form.pair
+            [ Form.miniButton "Sửa kế hoạch" (RacingChanged OpenPlanEditor)
+            , Form.quietButton "Kết thúc" (RacingChanged RequestQuit)
+            ]
+        ]
+
+
+sosPanel : Model -> RaceState -> Html Msg
+sosPanel model race =
+    div [ class "sos" ]
+        [ div [ class "sos-head" ] [ text "Khi cần trợ giúp" ]
+        , Theme.note "Soạn sẵn tin báo vị trí. Nhắn tin đi được cả khi mất 4G, miễn còn sóng điện thoại."
+        , Form.pair
+            [ Form.textField "Số điện thoại BTC hoặc người nhà" model.sosPhone (RacingChanged << EditPhone)
+            , Form.miniButton "Nhắn tin" (RacingChanged SendSos)
+            ]
+        , div [ class "sos-preview" ]
+            [ text
+                (case Progress.lastFix race.progress of
+                    Nothing ->
+                        "Bấm Lấy GPS trước để có toạ độ đưa vào tin nhắn."
+
+                    Just fix ->
+                        Sos.message model.zone fix (Just (Progress.km race.progress))
+                )
+            ]
+        , Form.miniButton "Chép nội dung tin" (RacingChanged CopySos)
+        ]

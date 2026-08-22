@@ -37,7 +37,11 @@ anywhere, and needs no account. It is served at
 - A ready-made help message with coordinates and the nearest course marker,
   sent by SMS or copied.
 - The race survives a refresh or a closed tab.
-- Plans can be saved to a file and opened again.
+- Works with no signal once it has been opened: the page is kept on the phone
+  and a refresh opens it from there. Add it to the home screen to open it like
+  an app.
+- Plans can be saved to a file and opened again; the file is named after the
+  GPX it came from.
 
 ## Shape of the code
 
@@ -88,7 +92,11 @@ qualified names are imported, and exposed names exist.
 `runtime/`, minifies both and inlines them with the stylesheet into
 `dist/index.html`. The app is used on a mountain with no signal; a single file
 that opens and runs is a hard requirement, so the script then asserts that the
-output references nothing outside itself.
+output references nothing outside itself. One more file sits beside it:
+`dist/sw.js`, the service worker built from `runtime/sw.ts`, which keeps
+`index.html` on the phone so a refresh with no signal still opens it. It has
+to be a separate file because a browser fetches a service worker by URL; the
+app runs without it.
 
 **Stylesheet over inline styles.** Elm names classes; `styles/app.css` owns the
 look. Spacing between stacked controls lives there too.
@@ -140,9 +148,9 @@ above, then the build, then publishes `dist/` to GitHub Pages at
 published and the previous version stays live. Day to day work happens on
 `development`; merging it into `main` is what ships.
 
-The built file is `dist/index.html`, one self-contained file named so that the
-folder can be published as-is. Serving it over https is what lets the browser
-grant geolocation.
+The built app is `dist/index.html`, one self-contained file named so that the
+folder can be published as-is, with `dist/sw.js` beside it. Serving over https
+is what lets the browser grant geolocation and register the service worker.
 
 ## Contributing
 

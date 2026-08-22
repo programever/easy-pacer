@@ -1,4 +1,4 @@
-module Storage.PlanFile exposing (decoder, encode, filename)
+module Storage.PlanFile exposing (decoder, encode, filename, nameFromFile)
 
 {-| The shareable plan file: course, checkpoints and start moment, as JSON.
 
@@ -25,15 +25,36 @@ currentVersion =
     1
 
 
-filename : String
-filename =
-    "ke-hoach-trail.json"
+{-| What the plan is saved as: the name of the file it was loaded from, so a
+plan built from `hbs-25k.gpx` saves as `hbs-25k.json` and a re-saved
+`hbs-25k.json` keeps its name.
+-}
+filename : Draft -> String
+filename draft =
+    if String.trim draft.name == "" then
+        "ke-hoach-trail.json"
+
+    else
+        draft.name ++ ".json"
+
+
+{-| A file's name without its extension.
+-}
+nameFromFile : String -> String
+nameFromFile fileName =
+    case List.reverse (String.split "." fileName) of
+        _ :: ((_ :: _) as rest) ->
+            String.join "." (List.reverse rest)
+
+        _ ->
+            fileName
 
 
 encode : Draft -> Encode.Value
 encode draft =
     Encode.object
         [ ( "version", Encode.int currentVersion )
+        , ( "name", Encode.string draft.name )
         , ( "route"
           , case draft.route of
                 Nothing ->
@@ -124,12 +145,13 @@ roleToString role =
 
 decoder : Decoder Draft
 decoder =
-    Decode.map4
-        (\course checkpoints maybeDate maybeTime ->
+    Decode.map5
+        (\course checkpoints maybeDate maybeTime name ->
             { route = course
             , checkpoints = checkpoints
             , date = maybeDate
             , time = maybeTime
+            , name = name
             , nextId =
                 1 + (List.maximum (List.map (.id >> Checkpoint.idToInt) checkpoints) |> Maybe.withDefault -1)
             }
@@ -142,6 +164,7 @@ decoder =
         (Decode.field "time" (Decode.nullable Decode.string)
             |> Decode.map (Maybe.andThen Clock.fromString)
         )
+        (Decode.oneOf [ Decode.field "name" Decode.string, Decode.succeed "" ])
 
 
 isoDate : String -> Maybe DateOnly.DateOnly

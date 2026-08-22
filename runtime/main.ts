@@ -3,6 +3,7 @@ import '../styles/app.css'
 import * as geolocation from './geolocation'
 import * as gpx from './gpx'
 import * as handoff from './handoff'
+import { install } from './install'
 import * as storage from './storage'
 import type { Ports } from './ports'
 
@@ -39,3 +40,5 @@ wire('geolocation', ['requestGps', 'gpsIn'], () => geolocation.attach(ports))
 wire('gpx', ['parseGpx', 'gpxIn'], () => gpx.attach(ports))
 wire('storage', ['save', 'clear'], () => storage.attach(ports))
 wire('handoff', ['copyText', 'openSms'], () => handoff.attach(ports))
+
+install()

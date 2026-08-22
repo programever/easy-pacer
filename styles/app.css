@@ -61,6 +61,10 @@ button{font-family:inherit;}
 /* Stacked controls breathe. The original set these as inline styles on each
    button; Elm only names classes, so the spacing lives here instead. */
 .step>.btn+.btn,.step>.btn+.pair,.step>div+.btn,.step>div+.pair,.sos>.sos-preview+.btn{margin-top:10px;}
+/* The same inside a sheet: choices stack, and a quiet button spans the
+   sheet like the others so the stack reads as one list. */
+.sheet>.btn+.btn,.sheet>.choice+.btn,.sheet>.issue+.pair{margin-top:10px;}
+.sheet>.btn.mini{width:100%;}
 
 input[type=text],input[type=number],input[type=time]{
   width:100%;max-width:100%;min-width:0;display:block;

@@ -56,7 +56,9 @@ update msg state model =
             ( model, File.Select.file [] (SettingChanged << GpxFileSelected) )
 
         GpxFileSelected file ->
-            ( model, Task.perform (SettingChanged << GpxTextRead) (File.toString file) )
+            ( withDraft { draft | name = PlanFile.nameFromFile (File.name file) } state model
+            , Task.perform (SettingChanged << GpxTextRead) (File.toString file)
+            )
 
         GpxTextRead contents ->
             ( model, Ports.parseGpx contents )
@@ -186,7 +188,7 @@ update msg state model =
 
         ExportPlan ->
             ( model
-            , File.Download.string PlanFile.filename
+            , File.Download.string (PlanFile.filename draft)
                 "application/json"
                 (Encode.encode 0 (PlanFile.encode draft))
             )
@@ -195,12 +197,14 @@ update msg state model =
             ( model, File.Select.file [] (SettingChanged << PlanFileSelected) )
 
         PlanFileSelected file ->
-            ( model, Task.perform (SettingChanged << PlanTextRead) (File.toString file) )
+            ( withDraft { draft | name = PlanFile.nameFromFile (File.name file) } state model
+            , Task.perform (SettingChanged << PlanTextRead) (File.toString file)
+            )
 
         PlanTextRead contents ->
             case Decode.decodeString PlanFile.decoder contents of
                 Ok loaded ->
-                    ( withDraft { loaded | checkpoints = orderForEditing loaded.checkpoints } state model
+                    ( withDraft { loaded | checkpoints = orderForEditing loaded.checkpoints, name = draft.name } state model
                     , Cmd.none
                     )
 

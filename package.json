@@ -4,7 +4,7 @@
   "description": "Build and toolchain only. The app itself has no JavaScript dependencies; runtime/ is the port boundary and everything under src/ is Elm.",
   "scripts": {
     "start": "vite",
-    "check": "elm make src/Main.elm --output=/dev/null && tsc --noEmit",
+    "check": "elm make src/Main.elm --output=/dev/null && tsc --noEmit && tsc --noEmit -p tsconfig.sw.json",
     "format": "elm-format --validate src/ tests/",
     "test": "elm-test",
     "structure": "python3 devops/check.py",

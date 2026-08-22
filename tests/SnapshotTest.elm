@@ -133,6 +133,7 @@ racing =
             , date = DateOnly.fromParts 2026 7 25
             , time = Clock.fromString "06:00"
             , nextId = 4
+            , name = ""
             }
 
         fix =

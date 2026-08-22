@@ -114,6 +114,7 @@ start =
                     , date = Nothing
                     , time = Nothing
                     , nextId = 4
+                    , name = ""
                     }
                 )
     }

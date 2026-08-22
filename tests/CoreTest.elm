@@ -16,6 +16,7 @@ import Core.Data.DateOnly as DateOnly
 import Core.Data.Distance as Distance
 import Expect
 import State
+import Storage.PlanFile as PlanFile
 import Test exposing (Test, describe, test)
 import Time
 
@@ -88,6 +89,14 @@ suite =
                 \_ -> Expect.equal (trustFor 15 80) False
             , test "a precise fix far from the course is refused too" <|
                 \_ -> Expect.equal (trustFor 300 8) False
+            ]
+        , describe "A plan is saved under the name of the file it came from"
+            [ test "gpx becomes json" <|
+                \_ -> Expect.equal (PlanFile.nameFromFile "hbs-25k.gpx" ++ ".json") "hbs-25k.json"
+            , test "dots inside the name survive" <|
+                \_ -> Expect.equal (PlanFile.nameFromFile "HBS 2026.v2.gpx") "HBS 2026.v2"
+            , test "no extension, no change" <|
+                \_ -> Expect.equal (PlanFile.nameFromFile "route") "route"
             ]
         , gestureSuite
         ]

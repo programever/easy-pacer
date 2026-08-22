@@ -48,15 +48,20 @@ type Plan
         , checkpoints : NonEmpty Checkpoint
         , date : DateOnly
         , time : Clock
+        , name : String
         }
 
 
+{-| `name` is the name of the file the plan came from, without its extension,
+and is what the plan is saved as. Empty until a file has been loaded.
+-}
 type alias Draft =
     { route : Maybe Route
     , checkpoints : List Checkpoint
     , date : Maybe DateOnly
     , time : Maybe Clock
     , nextId : Int
+    , name : String
     }
 
 
@@ -89,6 +94,7 @@ emptyDraft =
     , date = Nothing
     , time = Nothing
     , nextId = 0
+    , name = ""
     }
 
 
@@ -163,6 +169,7 @@ fromDraft draft =
                             , checkpoints = list
                             , date = currentDate
                             , time = currentTime
+                            , name = draft.name
                             }
                         )
 
@@ -200,6 +207,7 @@ toDraft (Plan plan) nextId =
     , date = Just plan.date
     , time = Just plan.time
     , nextId = nextId
+    , name = plan.name
     }
 
 

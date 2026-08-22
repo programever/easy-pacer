@@ -1,7 +1,16 @@
 module Core.App.Km exposing
     ( Km
-    , start, fromFloat, toFloat
-    , advance, difference, isBefore, isAtOrBefore, clampTo, compare, min, max
+    , advance
+    , clampTo
+    , compare
+    , difference
+    , fromFloat
+    , isAtOrBefore
+    , isBefore
+    , max
+    , min
+    , start
+    , toFloat
     , toString
     )
 
@@ -12,6 +21,7 @@ gap between two milestones. Mixing them produced a real bug once: the point used
 to guide a lost runner back was taken from a list that had already been filtered
 to "ahead of the runner", so the shortest way back was never considered.
 `difference` returning `Distance` makes that class of mistake a type error.
+
 -}
 
 import Core.Data.Distance as Distance exposing (Distance)
@@ -41,7 +51,8 @@ advance gap (Km value) =
     Km (value + Distance.inKilometers gap)
 
 
-{-| The gap between two milestones, without direction. -}
+{-| The gap between two milestones, without direction.
+-}
 difference : Km -> Km -> Distance
 difference (Km a) (Km b) =
     Distance.fromKilometers (abs (b - a))
@@ -77,7 +88,8 @@ max (Km a) (Km b) =
     Km (Basics.max a b)
 
 
-{-| User facing, one decimal place. -}
+{-| User facing, one decimal place.
+-}
 toString : Km -> String
 toString (Km value) =
     let

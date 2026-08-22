@@ -1,7 +1,12 @@
 module Core.Data.DateOnly exposing
     ( DateOnly
-    , fromString, fromParts, fromPosix, addDays
-    , at, toString, toIsoString
+    , addDays
+    , at
+    , fromParts
+    , fromPosix
+    , fromString
+    , toIsoString
+    , toString
     )
 
 {-| A calendar day with no time attached. Exists so a race can be set up days
@@ -65,7 +70,8 @@ expandYear year =
         year
 
 
-{-| Anchor a time of day to this date, in the runner's own zone. -}
+{-| Anchor a time of day to this date, in the runner's own zone.
+-}
 at : Time.Zone -> DateOnly -> Clock -> Time.Posix
 at zone (DateOnly parts) clock =
     let
@@ -130,13 +136,15 @@ fromPosix zone posix =
         }
 
 
-{-| User facing, Vietnamese day-first order. -}
+{-| User facing, Vietnamese day-first order.
+-}
 toString : DateOnly -> String
 toString (DateOnly parts) =
     pad parts.day ++ "/" ++ pad parts.month ++ "/" ++ String.fromInt parts.year
 
 
-{-| Machine facing, for storage. -}
+{-| Machine facing, for storage.
+-}
 toIsoString : DateOnly -> String
 toIsoString (DateOnly parts) =
     String.fromInt parts.year ++ "-" ++ pad parts.month ++ "-" ++ pad parts.day
@@ -173,7 +181,8 @@ isLeapYear year =
     (modBy 4 year == 0 && modBy 100 year /= 0) || modBy 400 year == 0
 
 
-{-| Days since the Unix epoch, by Howard Hinnant's civil calendar algorithm. -}
+{-| Days since the Unix epoch, by Howard Hinnant's civil calendar algorithm.
+-}
 daysFromCivil : Int -> Int -> Int -> Int
 daysFromCivil year month day =
     let

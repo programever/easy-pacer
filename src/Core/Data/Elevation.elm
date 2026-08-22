@@ -1,8 +1,13 @@
 module Core.Data.Elevation exposing
     ( Elevation
-    , fromMeters, zero
-    , inMeters, inWholeMeters
-    , add, difference, gain, loss
+    , add
+    , difference
+    , fromMeters
+    , gain
+    , inMeters
+    , inWholeMeters
+    , loss
+    , zero
     )
 
 {-| A height above sea level, or an accumulated amount of climbing. Kept
@@ -40,7 +45,8 @@ add (Elevation a) (Elevation b) =
     Elevation (a + b)
 
 
-{-| Signed: positive when `to` is higher than `from`. -}
+{-| Signed: positive when `to` is higher than `from`.
+-}
 difference : Elevation -> Elevation -> Float
 difference (Elevation from) (Elevation to) =
     to - from

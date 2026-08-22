@@ -56,13 +56,15 @@ update msg race model =
             )
 
         RequestGps ->
-            ( model, Ports.requestGps () )
+            ( put { race | gpsPending = True } model, Ports.requestGps () )
 
         ChoosePosition candidate ->
-            ( { model | dialog = Nothing }
-                |> put (acceptCandidate candidate race)
-            , Cmd.none
-            )
+            case acceptCandidate candidate race of
+                Nothing ->
+                    ( { model | dialog = Nothing }, Cmd.none )
+
+                Just ( updated, report ) ->
+                    ( notifyMaybe report (put updated { model | dialog = Nothing }), Cmd.none )
 
         KeepPosition ->
             ( { model | dialog = Nothing }, Cmd.none )
@@ -205,6 +207,11 @@ notify content model =
     { model | toast = Just { text = content, shownAt = model.now } }
 
 
+notifyMaybe : Maybe String -> Model -> Model
+notifyMaybe content model =
+    Maybe.map (\text -> notify text model) content |> Maybe.withDefault model
+
+
 {-| A distance the runner types is a decision, and it overrides the displayed
 position too. Leaving the old dot on the map would make the next fix compare
 itself against a place the runner is no longer standing.
@@ -265,53 +272,96 @@ applyGps fix race model =
             ( { model | dialog = Just (PickPosition details.options) }, Cmd.none )
 
         Just (Resolved details) ->
-            ( put (acceptResolution details.progress details.nearest fix race) model
-            , Cmd.none
-            )
+            let
+                ( updated, report ) =
+                    acceptResolution details.progress details.nearest fix race
+            in
+            ( notifyMaybe report (put updated model), Cmd.none )
 
 
-acceptCandidate : Candidate -> RaceState -> RaceState
+acceptCandidate : Candidate -> RaceState -> Maybe ( RaceState, Maybe String )
 acceptCandidate candidate race =
-    case Progress.lastFix race.progress of
-        Nothing ->
-            race
-
-        Just fix ->
-            acceptResolution candidate candidate fix race
+    Progress.lastFix race.progress
+        |> Maybe.map (\fix -> acceptResolution candidate candidate fix race)
 
 
-acceptResolution : Candidate -> Candidate -> Fix -> RaceState -> RaceState
+{-| Apply a resolved fix, and say what was done with it. The km only moves on
+a fix that passes `Position.isTrustworthy`; a rejected reading is still kept
+for guidance, and the runner is told why the number did not change, because a
+button that does nothing in silence is a button that gets pressed ten times.
+-}
+acceptResolution : Candidate -> Candidate -> Fix -> RaceState -> ( RaceState, Maybe String )
 acceptResolution forProgress forGuidance fix race =
     let
         state =
             Position.routeState fix forGuidance
 
-        deviation =
-            Position.candidateDeviation forGuidance
-
         trustworthy =
-            Distance.inMeters deviation
-                <= 250
-                && Distance.inMeters fix.accuracy
-                <= 100
+            Position.isTrustworthy fix forGuidance
+
+        before =
+            Progress.km race.progress
 
         reached =
             if trustworthy then
                 Position.candidateKm forProgress
 
             else
-                Progress.km race.progress
+                before
+
+        accuracy =
+            "±" ++ String.fromInt (Distance.inWholeMeters fix.accuracy) ++ " m"
+
+        deviation =
+            String.fromInt (Distance.inWholeMeters (Position.candidateDeviation forGuidance)) ++ " m"
+
+        gained =
+            Distance.inKilometers (Km.difference before reached)
+
+        imprecise =
+            Distance.isGreaterThan Position.acceptableAccuracy fix.accuracy
+
+        -- An imprecise fix gets no toast: the guide panel explains it in
+        -- full, in place, and the tab switch below puts that panel on screen.
+        report =
+            if imprecise then
+                Nothing
+
+            else
+                Just
+                    (case state of
+                        OffRoute ->
+                            "Cách vệt " ++ deviation ++ " (" ++ accuracy ++ ") — xem hướng quay lại."
+
+                        Uncertain ->
+                            "Cách vệt " ++ deviation ++ " (" ++ accuracy ++ ") — chưa kết luận được, đứng yên thử lại."
+
+                        OnRoute ->
+                            "km "
+                                ++ Km.toString reached
+                                ++ (if gained > 0.05 && Km.isBefore reached before then
+                                        " · thêm " ++ Km.toString (Km.fromFloat gained) ++ " km"
+
+                                    else
+                                        " · chưa đổi"
+                                   )
+                                ++ " ("
+                                ++ accuracy
+                                ++ ")"
+                    )
     in
-    { race
+    ( { race
         | progress = Progress.fromGps reached fix (state == OnRoute) race.progress
         , plan = syncPlan reached fix.taken race.plan
         , tab =
-            if state == OnRoute then
+            if state == OnRoute && not imprecise then
                 race.tab
 
             else
                 LocateTab
-    }
+      }
+    , report
+    )
 
 
 
@@ -712,81 +762,115 @@ guideFor race fix nearest =
         deviation =
             String.fromInt (Distance.inWholeMeters (Position.candidateDeviation nearest))
 
+        accuracyMetres =
+            String.fromInt (Distance.inWholeMeters fix.accuracy)
+
         accuracy =
-            " · sai số máy đo ±" ++ String.fromInt (Distance.inWholeMeters fix.accuracy) ++ " m"
+            " · sai số máy đo ±" ++ accuracyMetres ++ " m"
+
+        -- The fix was too imprecise to move the km. Said here, in red, under
+        -- whatever the panel already says, because this is where the runner
+        -- is looking when they want to know why the number did not change.
+        rejected =
+            if Distance.isGreaterThan Position.acceptableAccuracy fix.accuracy then
+                [ div [ class "reject" ]
+                    [ text
+                        ("Sai số ±"
+                            ++ accuracyMetres
+                            ++ " m quá lớn nên chưa cập nhật km. Ra chỗ thoáng rồi bấm Lấy GPS lại, hoặc nhập số km."
+                        )
+                    ]
+                ]
+
+            else
+                []
+
+        body =
+            case state of
+                OnRoute ->
+                    [ div [ class "head" ] [ text "ĐANG TRÊN ĐƯỜNG CHẠY" ]
+                    , div [ class "detail" ]
+                        [ text
+                            ("Cách vệt "
+                                ++ deviation
+                                ++ " m, ở khoảng km "
+                                ++ Km.toString (Progress.km race.progress)
+                                ++ accuracy
+                                ++ ". Cứ đi tiếp."
+                            )
+                        ]
+                    ]
+
+                Uncertain ->
+                    [ div [ class "head" ] [ text "CHƯA KẾT LUẬN ĐƯỢC" ]
+                    , div [ class "detail" ]
+                        [ text
+                            ("Máy báo cách vệt "
+                                ++ deviation
+                                ++ " m"
+                                ++ accuracy
+                                ++ " — độ lệch còn nằm trong sai số, nên có thể bạn vẫn đang trên đường chạy."
+                            )
+                        ]
+                    , Html.ol []
+                        [ Html.li [] [ text "Đứng yên tại chỗ, tránh chỗ có tán cây dày hoặc vách đá che." ]
+                        , Html.li [] [ text "Bấm Lấy GPS lại sau vài chục giây để máy bắt tín hiệu tốt hơn." ]
+                        , Html.li [] [ text "Trong lúc chờ, nhìn quanh tìm dấu ruy băng của BTC." ]
+                        ]
+                    ]
+
+                OffRoute ->
+                    let
+                        heading =
+                            LatLon.bearing fix.at (Position.candidateSnap nearest)
+
+                        direction =
+                            LatLon.compass heading
+
+                        backKm =
+                            Position.candidateKm nearest
+
+                        behind =
+                            Km.isBefore (Progress.km race.progress) backKm
+                    in
+                    [ div [ class "head" ] [ text ("BẠN ĐÃ RỜI ĐƯỜNG CHẠY " ++ deviation ++ " M") ]
+                    , Html.span [ class "arrow" ] [ text (LatLon.compassArrow direction) ]
+                    , div [ class "detail" ]
+                        [ text
+                            ("Đi hướng "
+                                ++ LatLon.compassLabel direction
+                                ++ " ("
+                                ++ String.fromInt (LatLon.bearingDegrees heading)
+                                ++ "°) khoảng "
+                                ++ deviation
+                                ++ " m để về vệt tại km "
+                                ++ Km.toString backKm
+                                ++ "."
+                                ++ (if behind then
+                                        " Điểm này nằm ở đoạn bạn đã đi qua — về tới nơi thì đi xuôi trở lại."
+
+                                    else
+                                        ""
+                                   )
+                            )
+                        ]
+                    , Html.ol []
+                        [ Html.li [] [ text "Dừng lại, đừng đi thêm cho tới khi biết hướng." ]
+                        , Html.li [] [ text ("Xoay người cho tới khi hướng đi khớp với " ++ LatLon.compassLabel direction ++ "; xem sơ đồ bên dưới để đối chiếu.") ]
+                        , Html.li []
+                            [ text
+                                (if Distance.inMeters (Position.candidateDeviation nearest) > 400 then
+                                    "Lệch hơn 400 m thì an toàn nhất là lần ngược theo đường bạn vừa đi (các chấm xám trên sơ đồ) về chỗ còn thấy dấu của BTC."
+
+                                 else
+                                    "Vừa đi vừa để ý dấu ruy băng của BTC hai bên đường."
+                                )
+                            ]
+                        , Html.li [] [ text "Tới nơi bấm Lấy GPS lại để xác nhận đã về đúng vệt." ]
+                        ]
+                    ]
     in
-    case state of
-        OnRoute ->
-            div [ class (Theme.routeStateClass state) ]
-                [ div [ class "head" ] [ text "ĐANG TRÊN ĐƯỜNG CHẠY" ]
-                , div [ class "detail" ]
-                    [ text
-                        ("Cách vệt "
-                            ++ deviation
-                            ++ " m, ở khoảng km "
-                            ++ Km.toString (Progress.km race.progress)
-                            ++ accuracy
-                            ++ ". Cứ đi tiếp."
-                        )
-                    ]
-                ]
-
-        Uncertain ->
-            div [ class (Theme.routeStateClass state) ]
-                [ div [ class "head" ] [ text "CHƯA KẾT LUẬN ĐƯỢC" ]
-                , div [ class "detail" ]
-                    [ text
-                        ("Máy báo cách vệt "
-                            ++ deviation
-                            ++ " m"
-                            ++ accuracy
-                            ++ " — độ lệch còn nằm trong sai số, nên có thể bạn vẫn đang trên đường chạy."
-                        )
-                    ]
-                , Html.ol []
-                    [ Html.li [] [ text "Đứng yên tại chỗ, tránh chỗ có tán cây dày hoặc vách đá che." ]
-                    , Html.li [] [ text "Bấm Lấy GPS lại sau vài chục giây để máy bắt tín hiệu tốt hơn." ]
-                    , Html.li [] [ text "Trong lúc chờ, nhìn quanh tìm dấu ruy băng của BTC." ]
-                    ]
-                ]
-
-        OffRoute ->
-            let
-                heading =
-                    LatLon.bearing fix.at (Position.candidateSnap nearest)
-
-                direction =
-                    LatLon.compass heading
-
-                backKm =
-                    Position.candidateKm nearest
-
-                behind =
-                    Km.isBefore (Progress.km race.progress) backKm
-            in
-            div [ class (Theme.routeStateClass state) ]
-                [ div [ class "head" ] [ text ("BẠN ĐÃ RỜI ĐƯỜNG CHẠY " ++ deviation ++ " M") ]
-                , Html.span [ class "arrow" ] [ text (LatLon.compassArrow direction) ]
-                , div [ class "detail" ]
-                    [ text
-                        ("Đi hướng "
-                            ++ LatLon.compassLabel direction
-                            ++ " ("
-                            ++ String.fromInt (LatLon.bearingDegrees heading)
-                            ++ "°) khoảng "
-                            ++ deviation
-                            ++ " m để về vệt tại km "
-                            ++ Km.toString backKm
-                            ++ "."
-                            ++ (if behind then
-                                    " Điểm này nằm ở đoạn bạn đã đi qua — về tới nơi thì đi xuôi trở lại."
-
-                                else
-                                    ""
-                               )
-                        )
-                    ]
-                ]
+    div [ class (Theme.routeStateClass state) ] (body ++ rejected)
 
 
 dock : RaceState -> Html Msg
@@ -794,7 +878,7 @@ dock race =
     div [ class "dock" ]
         [ div [ class "hint" ] [ text "App chỉ đọc GPS khi bạn bấm — không chạy nền, không hao pin." ]
         , Form.pair
-            [ Form.tallButton "Lấy GPS" (RacingChanged RequestGps)
+            [ Form.pendingButton "Lấy GPS" "Đang bắt GPS…" race.gpsPending (RacingChanged RequestGps)
             , Html.button
                 [ class "btn tall", onClick (RacingChanged ToggleKmEntry) ]
                 [ text "Nhập số km" ]

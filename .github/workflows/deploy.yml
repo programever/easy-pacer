@@ -1,0 +1,70 @@
+# Builds the one-file app and publishes it to GitHub Pages.
+#
+# Every gate runs before the build, and the build runs before the deploy, so a
+# change that does not type check, fails a test, breaks the structural rules or
+# produces a file that reaches for the network never replaces the live site.
+# The previous deploy simply stays up.
+#
+# Deploys from main only. Work happens on development; merging to main is the
+# release.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # The Elm package cache. Without it every run fetches the seven direct
+      # dependencies from package.elm-lang.org, which is both slow and a point
+      # of failure the app itself does not have.
+      - uses: actions/cache@v6
+        with:
+          path: ~/.elm
+          key: elm-${{ runner.os }}-${{ hashFiles('elm.json') }}
+
+      # Installs elm, elm-format and elm-test at the pinned versions; the elm
+      # package's postinstall fetches the Linux compiler binary.
+      - run: npm ci
+
+      - run: npm run check
+      - run: npm run format
+      - run: npm test
+      - run: npm run structure
+
+      # dist/ holds exactly one file, index.html, and build.sh has already
+      # asserted it references nothing outside itself.
+      - run: npm run build
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

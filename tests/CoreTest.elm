@@ -81,8 +81,23 @@ suite =
             , test "close in is on course whatever the noise" <|
                 \_ -> Expect.equal (stateFor 15 8) OnRoute
             ]
+        , describe "Only a precise fix may move the milestone"
+            [ test "eight metres of noise, on the course" <|
+                \_ -> Expect.equal (trustFor 15 8) True
+            , test "eighty metres of noise is refused even on the course" <|
+                \_ -> Expect.equal (trustFor 15 80) False
+            , test "a precise fix far from the course is refused too" <|
+                \_ -> Expect.equal (trustFor 300 8) False
+            ]
         , gestureSuite
         ]
+
+
+trustFor : Float -> Float -> Bool
+trustFor deviationMetres accuracyMetres =
+    Position.isTrustworthy
+        { at = onTheOverlap, accuracy = Distance.fromMeters accuracyMetres, taken = Time.millisToPosix 0 }
+        (Position.candidateAt (Km.fromFloat 18.45) (Distance.fromMeters deviationMetres) onTheOverlap)
 
 
 {-| Builds a candidate at a chosen deviation without needing a real course.

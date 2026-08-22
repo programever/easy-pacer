@@ -1,8 +1,17 @@
 module Core.Data.Distance exposing
     ( Distance
-    , fromKilometers, fromMeters, zero
-    , inKilometers, inMeters, inWholeMeters
-    , add, subtract, scale, compare, isGreaterThan, largest
+    , add
+    , compare
+    , fromKilometers
+    , fromMeters
+    , inKilometers
+    , inMeters
+    , inWholeMeters
+    , isGreaterThan
+    , largest
+    , scale
+    , subtract
+    , zero
     )
 
 {-| A length. Always stored in kilometers internally, but the constructors and
@@ -11,6 +20,7 @@ silently used where meters were meant.
 
 A `Distance` is a length BETWEEN two things. A position along a route is a
 different concept with a different type: see `Core.App.Km`.
+
 -}
 
 
@@ -53,7 +63,8 @@ add (Distance a) (Distance b) =
     Distance (a + b)
 
 
-{-| Never negative: distances have no direction. -}
+{-| Never negative: distances have no direction.
+-}
 subtract : Distance -> Distance -> Distance
 subtract (Distance a) (Distance b) =
     Distance (max 0 (a - b))

@@ -375,6 +375,7 @@ startRace draft model =
                         , scrub = NotScrubbing
                         , kmEntryOpen = False
                         , kmEntryText = ""
+                        , gpsPending = False
                         }
                 , dialog = Nothing
               }

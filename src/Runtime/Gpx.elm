@@ -1,4 +1,4 @@
-module Runtime.Gpx exposing (Payload, Error(..), decoder, errorMessage)
+module Runtime.Gpx exposing (Error(..), Payload, decoder, errorMessage)
 
 {-| Decoding what the GPX port sends back. The browser did the XML; this decides
 whether what came back is usable.
@@ -68,7 +68,8 @@ waypointDecoder =
         )
 
 
-{-| User facing. -}
+{-| User facing.
+-}
 errorMessage : Error -> String
 errorMessage error =
     case error of

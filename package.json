@@ -5,7 +5,7 @@
   "scripts": {
     "start": "vite",
     "check": "elm make src/Main.elm --output=/dev/null && tsc --noEmit",
-    "format": "elm-format --validate src/",
+    "format": "elm-format --validate src/ tests/",
     "test": "elm-test",
     "structure": "python3 devops/check.py",
     "build": "devops/build.sh"

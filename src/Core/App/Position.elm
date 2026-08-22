@@ -1,8 +1,18 @@
 module Core.App.Position exposing
-    ( Candidate, Resolution(..), RouteState(..)
-    , candidates, resolve, routeState
-    , candidateAt, candidateKm, candidateDeviation, candidateSnap
+    ( Candidate
+    , Resolution(..)
+    , RouteState(..)
+    , acceptableAccuracy
+    , acceptableDeviation
+    , candidateAt
+    , candidateDeviation
+    , candidateKm
+    , candidateSnap
+    , candidates
+    , isTrustworthy
     , offRouteThreshold
+    , resolve
+    , routeState
     )
 
 {-| Turning one GPS fix into two separate answers.
@@ -18,6 +28,7 @@ answers and must not share one:
     often behind you.
 
 Returning both in `Resolved` forces every caller to pick the right one.
+
 -}
 
 import Array
@@ -47,34 +58,67 @@ type RouteState
 
 
 {-| Beyond this a runner is treated as having left the course, provided the
-measurement is precise enough to say so. -}
+measurement is precise enough to say so.
+-}
 offRouteThreshold : Distance
 offRouteThreshold =
     Distance.fromMeters 60
 
 
+{-| A fix must be at least this precise before it is allowed to move the
+runner's milestone. Under tree cover a phone commonly reports 20 to 40 m;
+past this the snapped milestone can be a tenth of a kilometre out, and a
+number that can be wrong by that much is worse than the old one. The runner
+is told, and can stand somewhere clearer and try again, or type the km.
+-}
+acceptableAccuracy : Distance
+acceptableAccuracy =
+    Distance.fromMeters 50
+
+
+{-| Further than this from the course, a snapped milestone means nothing: the
+runner is lost, and the job is guidance back, not a km update.
+-}
+acceptableDeviation : Distance
+acceptableDeviation =
+    Distance.fromMeters 250
+
+
+{-| Whether a fix is good enough to move the milestone. Guidance back to the
+course is given regardless; only the km is protected.
+-}
+isTrustworthy : Fix -> Candidate -> Bool
+isTrustworthy fix (Candidate nearest) =
+    not (Distance.isGreaterThan acceptableAccuracy fix.accuracy)
+        && not (Distance.isGreaterThan acceptableDeviation nearest.deviation)
+
+
 {-| No runner covers ground faster than this, so any milestone implying it can
-be ruled out. Generous on purpose: it is a sanity bound, not a pace model. -}
+be ruled out. Generous on purpose: it is a sanity bound, not a pace model.
+-}
 maxSpeedKmPerHour : Float
 maxSpeedKmPerHour =
     18
 
 
-{-| GPS noise allowance for going backwards along the course. -}
+{-| GPS noise allowance for going backwards along the course.
+-}
 backwardTolerance : Distance
 backwardTolerance =
     Distance.fromMeters 300
 
 
 {-| Two candidates closer than this in deviation are treated as equally good,
-and something other than distance has to choose between them. -}
+and something other than distance has to choose between them.
+-}
 tieWindow : Distance
 tieWindow =
     Distance.fromMeters 50
 
 
 {-| Candidates whose milestones sit closer together than this are the same place
-seen twice by the scan, not two different passes. -}
+seen twice by the scan, not two different passes.
+-}
 mergeWindow : Float
 mergeWindow =
     0.4
@@ -211,6 +255,7 @@ Order of elimination:
 
 With no previous fix there is no speed ceiling at all: the app may have been
 opened halfway through a race, where a stored zero says nothing.
+
 -}
 resolve : Route -> Maybe Time.Posix -> Progress -> Fix -> Maybe Resolution
 resolve route startedAt progress fix =
@@ -392,6 +437,7 @@ measurement that says so.
 A deviation of 80 m reported by a fix that is itself accurate only to 80 m is no
 evidence at all. Sending someone 80 m in a chosen direction on that basis, in
 the dark, is worse than saying nothing: hence the third state.
+
 -}
 routeState : Fix -> Candidate -> RouteState
 routeState fix (Candidate c) =

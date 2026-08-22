@@ -6,6 +6,7 @@ module View.Form exposing
     , miniButton
     , numberField
     , pair
+    , pendingButton
     , quietButton
     , solidButton
     , tallButton
@@ -45,6 +46,23 @@ solidButton content toMsg =
 tallButton : String -> msg -> Html msg
 tallButton content toMsg =
     Html.button [ class "btn solid tall", onClick toMsg ] [ text content ]
+
+
+{-| A tall button that shows a second label and refuses clicks while the work
+it started is still running.
+-}
+pendingButton : String -> String -> Bool -> msg -> Html msg
+pendingButton content busyContent pending toMsg =
+    Html.button
+        [ class "btn solid tall", Attr.disabled pending, onClick toMsg ]
+        [ text
+            (if pending then
+                busyContent
+
+             else
+                content
+            )
+        ]
 
 
 quietButton : String -> msg -> Html msg

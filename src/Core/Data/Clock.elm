@@ -1,8 +1,12 @@
 module Core.Data.Clock exposing
     ( Clock
+    , fromHourMinute
+    , fromPosix
+    , fromString
+    , hour
     , midnight
-    , fromString, fromHourMinute, fromPosix
-    , hour, minute, minutesFromMidnight
+    , minute
+    , minutesFromMidnight
     , toString
     )
 

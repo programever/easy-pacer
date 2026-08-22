@@ -20,6 +20,7 @@ type Msg
     | GpsArrived Encode.Value
     | GpxArrived Encode.Value
     | DismissToast
+    | ShowAbout
     | CloseDialog
 
 

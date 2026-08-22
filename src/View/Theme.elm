@@ -1,8 +1,21 @@
 module View.Theme exposing
-    ( eyebrow, sectionTitle, note, hint
-    , card, quadCell, ledgerRow, verdict
-    , urgencyClass, routeStateClass
-    , checkpointColour, routeColour, passedColour, youColour, scrubColour, uncertainColour, lostColour
+    ( card
+    , checkpointColour
+    , eyebrow
+    , hint
+    , ledgerRow
+    , lostColour
+    , note
+    , passedColour
+    , quadCell
+    , routeColour
+    , routeStateClass
+    , scrubColour
+    , sectionTitle
+    , uncertainColour
+    , urgencyClass
+    , verdict
+    , youColour
     )
 
 {-| Class names and palette, in one place.
@@ -14,6 +27,7 @@ never inlines styles.
 One rule the palette encodes: every colour means exactly one thing. Checkpoints
 were yellow and so was the elevation cursor, which made the two impossible to
 tell apart while dragging a finger across the chart.
+
 -}
 
 import Core.App.Position exposing (RouteState(..))

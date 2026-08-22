@@ -1,7 +1,17 @@
 module Core.Data.NonEmpty exposing
     ( NonEmpty
-    , fromList, singleton, cons
-    , head, tail, toList, length, map, filterToList, foldl, minimumBy, sortBy
+    , cons
+    , filterToList
+    , foldl
+    , fromList
+    , head
+    , length
+    , map
+    , minimumBy
+    , singleton
+    , sortBy
+    , tail
+    , toList
     )
 
 {-| A list that is guaranteed to hold at least one element. Used for route

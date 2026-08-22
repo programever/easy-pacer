@@ -1,8 +1,12 @@
 port module Runtime.Ports exposing
-    ( requestGps, gpsIn
-    , parseGpx, gpxIn
-    , save, clear
-    , copyText, openSms
+    ( clear
+    , copyText
+    , gpsIn
+    , gpxIn
+    , openSms
+    , parseGpx
+    , requestGps
+    , save
     )
 
 {-| The only place this program touches the outside world.
@@ -16,6 +20,7 @@ untrusted `Value` and is decoded before it is allowed near the model.
 Keeping this boundary thin is what makes Elm's no-runtime-exception guarantee
 worth anything here: the guarantee stops at the port, so the port must not be
 where the thinking happens.
+
 -}
 
 import Json.Encode as Encode

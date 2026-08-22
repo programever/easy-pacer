@@ -104,6 +104,9 @@ type alias RaceState =
     , scrub : Scrub
     , kmEntryOpen : Bool
     , kmEntryText : String
+
+    -- A GPS request is out and has not answered yet. Transient: not saved.
+    , gpsPending : Bool
     }
 
 
@@ -123,6 +126,7 @@ type Dialog
     = PlanReview (List Issue) Bool
     | PickPosition (NonEmpty Candidate)
     | ConfirmQuit
+    | About
 
 
 type alias Toast =

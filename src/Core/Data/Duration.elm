@@ -1,8 +1,13 @@
 module Core.Data.Duration exposing
     ( Duration
-    , fromMinutes, fromMillis, between
-    , inMinutes, inHours, isNegative
-    , toCompactString, toSignedString
+    , between
+    , fromMillis
+    , fromMinutes
+    , inHours
+    , inMinutes
+    , isNegative
+    , toCompactString
+    , toSignedString
     )
 
 {-| A signed span of time. Negative is meaningful here: a cutoff can be in the
@@ -46,7 +51,8 @@ isNegative (Duration m) =
     m < 0
 
 
-{-| User facing. Vietnamese, because this string is rendered as-is. -}
+{-| User facing. Vietnamese, because this string is rendered as-is.
+-}
 toCompactString : Duration -> String
 toCompactString (Duration raw) =
     let
@@ -73,7 +79,8 @@ toCompactString (Duration raw) =
         sign ++ String.fromInt minutes ++ "ph"
 
 
-{-| Always carries an explicit sign, for "ahead of / behind the cutoff". -}
+{-| Always carries an explicit sign, for "ahead of / behind the cutoff".
+-}
 toSignedString : Duration -> String
 toSignedString ((Duration raw) as duration) =
     if raw >= 0 then

@@ -1,6 +1,7 @@
 module Runtime.Gps exposing (Error(..), decoder, errorMessage)
 
-{-| Decoding one position from the geolocation port. -}
+{-| Decoding one position from the geolocation port.
+-}
 
 import Core.App.Progress exposing (Fix)
 import Core.Data.Distance as Distance
@@ -61,7 +62,8 @@ codeToError code =
             Unavailable
 
 
-{-| User facing. -}
+{-| User facing.
+-}
 errorMessage : Error -> String
 errorMessage error =
     case error of

@@ -1,8 +1,19 @@
 module Core.App.LatLon exposing
-    ( LatLon, Bearing, Compass(..), Plane, Projection
-    , haversine, bearing, compass
-    , projection, project, planeDistance, projectOntoSegment
-    , bearingDegrees, compassLabel, compassArrow
+    ( Bearing
+    , Compass(..)
+    , LatLon
+    , Plane
+    , Projection
+    , bearing
+    , bearingDegrees
+    , compass
+    , compassArrow
+    , compassLabel
+    , haversine
+    , planeDistance
+    , project
+    , projectOntoSegment
+    , projection
     , toCoordinateString
     )
 
@@ -13,6 +24,7 @@ Distances on a trail route span a few tens of kilometers at most, so an
 equirectangular projection anchored at the route's own latitude is accurate to
 well under a meter here, and it turns "closest point on the route" into plain
 two dimensional geometry.
+
 -}
 
 import Core.Data.Distance as Distance exposing (Distance)
@@ -129,7 +141,8 @@ compass (Bearing degreesValue) =
             NorthWest
 
 
-{-| User facing. -}
+{-| User facing.
+-}
 compassLabel : Compass -> String
 compassLabel direction =
     case direction of

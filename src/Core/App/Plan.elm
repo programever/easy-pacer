@@ -1,9 +1,24 @@
 module Core.App.Plan exposing
-    ( Plan, Draft, Issue(..)
-    , emptyDraft, draftWithRoute, fromDraft, toDraft
-    , route, checkpoints, date, time, startsAt
-    , issues, issueText, isBlocking
-    , cutoffMoment, ahead, nextAhead, nextWithCutoff, withCheckpoints
+    ( Draft
+    , Issue(..)
+    , Plan
+    , ahead
+    , checkpoints
+    , cutoffMoment
+    , date
+    , draftWithRoute
+    , emptyDraft
+    , fromDraft
+    , isBlocking
+    , issueText
+    , issues
+    , nextAhead
+    , nextWithCutoff
+    , route
+    , startsAt
+    , time
+    , toDraft
+    , withCheckpoints
     )
 
 {-| The race sheet: a course, a list of checkpoints, and the moment the runner
@@ -14,6 +29,7 @@ leaves the start line.
 `Plan`, so entering race mode without a course or a start time is not a state
 the program can reach. The plan review is not advice any more, it is the
 constructor.
+
 -}
 
 import Core.App.Checkpoint as Checkpoint exposing (Checkpoint, Cutoff(..))
@@ -54,7 +70,8 @@ type Issue
     | Advisory String
 
 
-{-| Implied speeds outside this band mean a cutoff was almost certainly mistyped. -}
+{-| Implied speeds outside this band mean a cutoff was almost certainly mistyped.
+-}
 implausiblyFastKmPerHour : Float
 implausiblyFastKmPerHour =
     15
@@ -116,7 +133,8 @@ draftWithRoute newRoute draft =
     }
 
 
-{-| Start and finish positions come from the course, never from typing. -}
+{-| Start and finish positions come from the course, never from typing.
+-}
 pinToRoute : Route -> Checkpoint -> Checkpoint
 pinToRoute currentRoute checkpoint =
     case checkpoint.role of
@@ -286,6 +304,7 @@ isBlocking issue =
 The whole app rests on cutoffs typed in by hand at a kitchen table. One wrong
 digit makes every figure downstream wrong, and the runner finds out at two in
 the morning in the middle of a forest.
+
 -}
 issues : Time.Zone -> Plan -> List Issue
 issues zone plan =

@@ -19,6 +19,7 @@ import Html.Attributes exposing (class)
 import Html.Events
 import Json.Decode as Decode
 import Json.Encode as Encode
+import Page.About as About
 import Page.Racing as Racing
 import Page.Setting as Setting
 import Runtime.Gps as Gps
@@ -114,15 +115,24 @@ step msg model =
                     ( model, Cmd.none )
 
         GpsArrived raw ->
-            case ( Decode.decodeValue Gps.decoder raw, model.screen ) of
+            let
+                settled =
+                    case model.screen of
+                        Racing race ->
+                            { model | screen = Racing { race | gpsPending = False } }
+
+                        Setting _ ->
+                            model
+            in
+            case ( Decode.decodeValue Gps.decoder raw, settled.screen ) of
                 ( Ok (Ok fix), Racing race ) ->
-                    Racing.applyGps fix race model
+                    Racing.applyGps fix race settled
 
                 ( Ok (Err error), _ ) ->
-                    ( notify (Gps.errorMessage error) model, Cmd.none )
+                    ( notify (Gps.errorMessage error) settled, Cmd.none )
 
                 _ ->
-                    ( notify "Không lấy được vị trí." model, Cmd.none )
+                    ( notify "Không lấy được vị trí." settled, Cmd.none )
 
         GpxArrived raw ->
             case ( Decode.decodeValue Gpx.decoder raw, model.screen ) of
@@ -147,6 +157,9 @@ step msg model =
 
         DismissToast ->
             ( { model | toast = Nothing }, Cmd.none )
+
+        ShowAbout ->
+            ( { model | dialog = Just About }, Cmd.none )
 
         CloseDialog ->
             ( { model | dialog = Nothing }, Cmd.none )
@@ -218,7 +231,10 @@ freshness model =
 footer : Html Msg
 footer =
     Html.footer [ class "fine" ]
-        [ text "Chạy hoàn toàn offline · Không gửi dữ liệu đi đâu" ]
+        [ text "Chạy hoàn toàn offline · Không gửi dữ liệu đi đâu"
+        , Html.br [] []
+        , Html.button [ class "link", Html.Events.onClick ShowAbout ] [ text "Về ứng dụng · Góp ý trên GitHub" ]
+        ]
 
 
 toastLayer : Model -> Html Msg
@@ -275,6 +291,10 @@ dialogLayer model =
                 , Form.button "Xoá hết" (RacingChanged Action.QuitAndErase)
                 , Form.quietButton "Quay lại" CloseDialog
                 ]
+
+        Just About ->
+            div [ class "veil" ]
+                [ div [ class "sheet" ] [ About.view CloseDialog ] ]
 
 
 sheet : String -> String -> List (Html Msg) -> Html Msg

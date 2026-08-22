@@ -1,6 +1,10 @@
 module Core.App.Segment exposing
-    ( Segment, CutoffMoment, Urgency(..)
-    , toCheckpoint, urgency, deadline
+    ( CutoffMoment
+    , Segment
+    , Urgency(..)
+    , deadline
+    , toCheckpoint
+    , urgency
     )
 
 {-| The four numbers the race screen exists to show, for one checkpoint: how far
@@ -10,16 +14,16 @@ until it closes.
 Nothing here is predicted. Distance and elevation are read off the course;
 the remaining time is a clock subtraction. How fast to run is the runner's
 business, and a wrong estimate is worse than none.
+
 -}
 
 import Core.App.Checkpoint exposing (Checkpoint)
-import Core.App.Km exposing (Km)
+import Core.App.Km as Km exposing (Km)
 import Core.App.Plan as Plan exposing (Plan)
 import Core.App.Route as Route
 import Core.Data.Distance exposing (Distance)
 import Core.Data.Duration as Duration exposing (Duration)
 import Core.Data.Elevation exposing (Elevation)
-import Core.App.Km as Km
 import Time
 
 
@@ -37,7 +41,8 @@ type alias CutoffMoment =
     }
 
 
-{-| How much attention a countdown deserves. Derived, never stored. -}
+{-| How much attention a countdown deserves. Derived, never stored.
+-}
 type Urgency
     = NoDeadline
     | Comfortable
@@ -45,7 +50,8 @@ type Urgency
     | Missed
 
 
-{-| Under this many minutes the runner should not be lingering at a station. -}
+{-| Under this many minutes the runner should not be lingering at a station.
+-}
 tightMinutes : Float
 tightMinutes =
     30
@@ -94,6 +100,7 @@ When the next checkpoint is a water station it has no cutoff of its own, but the
 deadline still exists further ahead. Leaving the countdown blank there wastes
 the most important figure on the screen, so it is borrowed and labelled with the
 checkpoint it belongs to.
+
 -}
 deadline : Time.Zone -> Plan -> Km -> Time.Posix -> Maybe ( Checkpoint, CutoffMoment )
 deadline zone plan from now =

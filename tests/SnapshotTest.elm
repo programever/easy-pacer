@@ -166,6 +166,7 @@ racing =
                             , scrub = State.NotScrubbing
                             , kmEntryOpen = False
                             , kmEntryText = ""
+                            , gpsPending = False
                             }
                 }
             )

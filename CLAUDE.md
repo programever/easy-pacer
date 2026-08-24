@@ -67,6 +67,11 @@ the code compiles. In a type-first repo the type edit IS the plan.
 
 Sub-number every item so review comments can name a point.
 
+## iOS Safari lessons
+
+- Safari on iOS ignores `touch-action` on SVG elements. The wrapper div
+  (`.profile-card`, `.map-card`) carries `touch-action:none`, not just the SVG.
+
 ## Keeping this file useful
 
 If you learn something the next session would have wanted to know, add it here

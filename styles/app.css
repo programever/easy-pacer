@@ -109,7 +109,8 @@ label.lbl{display:block;font-size:12px;color:var(--muted);margin-bottom:5px;}
 .fact .k{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.09em;margin-top:3px;}
 
 /* ---------- elevation profile: the signature ---------- */
-.profile-card{background:var(--ink-2);border:1px solid var(--line);border-radius:14px;padding:12px 12px 8px;margin-top:14px;}
+/* touch-action on the wrapper, not only the SVG: iOS Safari ignores it on SVG elements. */
+.profile-card{background:var(--ink-2);border:1px solid var(--line);border-radius:14px;padding:12px 12px 8px;margin-top:14px;touch-action:none;}
 .profile-card svg{display:block;width:100%;height:96px;touch-action:none;cursor:crosshair;}
 /* Pointer positions are read relative to the SVG, so the SVG must be the target. */
 .profile-card svg *,.map-card svg *{pointer-events:none;}
@@ -184,7 +185,7 @@ label.lbl{display:block;font-size:12px;color:var(--muted);margin-bottom:5px;}
 .amt.ok{color:var(--ok);} .amt.warn{color:var(--warn);} .amt.late{color:var(--late);} .amt.flat{color:var(--muted);}
 
 /* ---------- locate screen ---------- */
-.map-card{margin:14px 16px 0;background:var(--ink-2);border:1px solid var(--line);border-radius:14px;overflow:hidden;}
+.map-card{margin:14px 16px 0;background:var(--ink-2);border:1px solid var(--line);border-radius:14px;overflow:hidden;touch-action:none;}
 .map-card svg{display:block;width:100%;height:300px;background:#0C131C;touch-action:none;cursor:grab;}
 .map-card svg:active{cursor:grabbing;}
 .map-foot{display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--line);align-items:center;}

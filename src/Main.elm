@@ -198,7 +198,16 @@ view model =
 header : Model -> Html Msg
 header model =
     Html.header [ class "bar" ]
-        [ div [ class "mark" ] [ text "TRẠM", Html.b [] [ text "KẾ" ] ]
+        [ div [ class "bar-brand" ]
+            [ div [ class "mark" ] [ text "TRẠM", Html.b [] [ text "KẾ" ] ]
+            , Html.a
+                [ class "bar-link"
+                , Html.Attributes.href About.repositoryUrl
+                , Html.Attributes.target "_blank"
+                , Html.Attributes.rel "noopener noreferrer"
+                ]
+                [ text "GitHub" ]
+            ]
         , div [ class "freshness" ] [ text (freshness model) ]
         ]
 

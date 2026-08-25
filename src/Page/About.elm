@@ -1,4 +1,4 @@
-module Page.About exposing (view)
+module Page.About exposing (repositoryUrl, view)
 
 {-| What the app is, what it does, and where to say something about it.
 
@@ -26,8 +26,10 @@ view close =
         , h3 [ class "about-h" ] [ text "App làm được gì" ]
         , ul []
             [ feature "Nạp file GPX của giải: đọc luôn cự ly, độ cao, mặt cắt và các trạm có sẵn trong file."
-            , feature "Điền bảng giờ đóng trạm (COT) của BTC. App soát lại kế hoạch trước khi chạy: trạm đặt sai km, COT lộn thứ tự, tốc độ phi lý."
+            , feature "Điền bảng giờ đóng trạm (COT) của BTC, sắp xếp trạm bằng nút ↑ ↓. App soát lại kế hoạch trước khi chạy: trạm đặt sai km, COT lộn thứ tự, mục tiêu mâu thuẫn với COT. Giải chạy qua đêm hay sang ngày thứ hai đều tính đúng giờ."
+            , feature "Đặt giờ mục tiêu cho từng trạm. Qua trạm rồi, app cho biết bạn sớm hay trễ so với kế hoạch của chính mình."
             , feature "Khi chạy: trạm kế tiếp còn bao xa, leo bao nhiêu, xuống bao nhiêu, còn bao lâu tới giờ đóng trạm — và toàn bộ chặng."
+            , feature "Trạng thái COT theo màu: xanh là dư giờ, vàng là phải giữ nhịp, đỏ là nguy cơ không kịp — tính trên quãng đường đã quy đổi dốc (mặc định 100 m leo = 1000 m đường bằng, chỉnh được)."
             , feature "Mặt cắt độ cao rê được bằng ngón tay, có con trỏ chạy theo trên sơ đồ đường chạy."
             , feature "Không chạy nền, không hao pin: app chỉ đọc GPS lúc bạn bấm. Muốn thấy số liệu mới, bấm Lấy GPS hoặc nhập số km đang chạy."
             , feature "Lấy GPS: xác định bạn đang ở km nào, kể cả đoạn đi-về trùng vệt. Nếu lạc, chỉ hướng và khoảng cách để quay lại vệt."

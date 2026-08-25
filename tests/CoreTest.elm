@@ -8,11 +8,15 @@ real race rather than an abstract failure.
 import Core.App.Checkpoint as Checkpoint exposing (Cutoff(..))
 import Core.App.Km as Km
 import Core.App.LatLon exposing (LatLon)
+import Core.App.Plan as Plan
 import Core.App.Position as Position exposing (RouteState(..))
 import Core.App.Route as Route
+import Core.App.Segment as Segment
 import Core.Data.Clock as Clock
 import Core.Data.DateOnly as DateOnly
 import Core.Data.Distance as Distance
+import Core.Data.Duration as Duration
+import Core.Data.Elevation as Elevation
 import Expect
 import State
 import Storage.PlanFile as PlanFile
@@ -85,6 +89,25 @@ suite =
             , test "just past thirty metres with a precise fix means off course" <|
                 \_ -> Expect.equal (stateFor 40 8) OffRoute
             ]
+        , describe "The cutoff colour is the pace the budget demands"
+            -- 5 km with 300 m of climb is 8 flat-equivalent km at 100 m = 1000 m.
+            [ test "over 15 minutes per km to spare is green" <|
+                \_ -> Expect.equal (paceUrgency 130 5 300) Segment.Comfortable
+            , test "exactly 15 is already yellow" <|
+                \_ -> Expect.equal (paceUrgency 120 5 300) Segment.Tight
+            , test "exactly 10 is still yellow" <|
+                \_ -> Expect.equal (paceUrgency 80 5 300) Segment.Tight
+            , test "under 10 minutes per km is red" <|
+                \_ -> Expect.equal (paceUrgency 79 5 300) Segment.Critical
+            , test "a cutoff already behind is missed" <|
+                \_ -> Expect.equal (paceUrgency -5 5 300) Segment.Missed
+            , test "the climb ratio changes the verdict" <|
+                -- Same leg at 100 m = 2000 m: 11 flat km, 120 minutes is under 11 min/km.
+                \_ ->
+                    Expect.equal
+                        (Segment.urgency 2000 (segmentFor 120 5 300))
+                        Segment.Tight
+            ]
         , describe "Only a precise fix may move the milestone"
             [ test "eight metres of noise, on the course" <|
                 \_ -> Expect.equal (trustFor 15 8) True
@@ -102,7 +125,262 @@ suite =
                 \_ -> Expect.equal (PlanFile.nameFromFile "route") "route"
             ]
         , gestureSuite
+        , targetSuite
+        , overnightSuite
         ]
+
+
+{-| The plan review rejects targets that run backwards along the course.
+-}
+targetSuite : Test
+targetSuite =
+    case
+        Route.fromSamples
+            [ { lat = 10.5, lon = 107.1, ele = 0 }
+            , { lat = 10.509, lon = 107.1, ele = 0 }
+            ]
+            []
+    of
+        Err _ ->
+            test "target fixture route builds" <| \_ -> Expect.fail "two points should make a route"
+
+        Ok course ->
+            let
+                planWith firstTarget secondTarget =
+                    Plan.fromDraft
+                        { route = Just course
+                        , checkpoints =
+                            [ Checkpoint.startLine (Checkpoint.idFromInt 0) gunTime
+                            , withTarget firstTarget (Checkpoint.station (Checkpoint.idFromInt 1) "A" (Km.fromFloat 0.3) NoCutoff)
+                            , withTarget secondTarget (Checkpoint.station (Checkpoint.idFromInt 2) "B" (Km.fromFloat 0.6) NoCutoff)
+                            , Checkpoint.finishLine (Checkpoint.idFromInt 3) (Km.fromFloat 0.9) NoCutoff
+                            ]
+                        , date = DateOnly.fromParts 2026 8 25
+                        , time = Clock.fromString "05:30"
+                        , nextId = 4
+                        , name = ""
+                        , climbRatio = 1000
+                        }
+
+                targetIssues result =
+                    case result of
+                        Err _ ->
+                            [ "PLAN DID NOT BUILD" ]
+
+                        Ok plan ->
+                            Plan.issues Time.utc plan
+                                |> List.map Plan.issueText
+                                |> List.filter (String.contains "Mục tiêu")
+
+                cutoffPlan target =
+                    Plan.fromDraft
+                        { route = Just course
+                        , checkpoints =
+                            [ Checkpoint.startLine (Checkpoint.idFromInt 0) gunTime
+                            , withTarget target
+                                (Checkpoint.station (Checkpoint.idFromInt 1)
+                                    "A"
+                                    (Km.fromFloat 0.3)
+                                    (Maybe.map ClosesAt (Clock.fromString "09:00") |> Maybe.withDefault NoCutoff)
+                                )
+                            , Checkpoint.finishLine (Checkpoint.idFromInt 2) (Km.fromFloat 0.9) NoCutoff
+                            ]
+                        , date = DateOnly.fromParts 2026 8 25
+                        , time = Clock.fromString "05:30"
+                        , nextId = 3
+                        , name = ""
+                        , climbRatio = 1000
+                        }
+            in
+            describe "Targets must advance with the course"
+                [ test "a later checkpoint with an earlier target is flagged" <|
+                    \_ ->
+                        targetIssues (planWith "08:00" "07:30")
+                            |> List.length
+                            |> Expect.equal 1
+                , test "targets in course order pass" <|
+                    \_ ->
+                        targetIssues (planWith "07:30" "08:00")
+                            |> Expect.equal []
+                , test "a target after the station's own COT is flagged" <|
+                    \_ ->
+                        targetIssues (cutoffPlan "09:30")
+                            |> List.length
+                            |> Expect.equal 1
+                , test "a target exactly at the COT is allowed" <|
+                    \_ ->
+                        targetIssues (cutoffPlan "09:00")
+                            |> Expect.equal []
+                , test "a station cannot aim later than the finish" <|
+                    \_ ->
+                        targetIssues
+                            (Plan.fromDraft
+                                { route = Just course
+                                , checkpoints =
+                                    [ Checkpoint.startLine (Checkpoint.idFromInt 0) gunTime
+                                    , withTarget "11:30" (Checkpoint.station (Checkpoint.idFromInt 1) "A" (Km.fromFloat 0.3) NoCutoff)
+                                    , withTarget "11:00" (Checkpoint.finishLine (Checkpoint.idFromInt 2) (Km.fromFloat 0.9) NoCutoff)
+                                    ]
+                                , date = DateOnly.fromParts 2026 8 25
+                                , time = Clock.fromString "05:30"
+                                , nextId = 3
+                                , name = ""
+                                , climbRatio = 1000
+                                }
+                            )
+                            |> List.length
+                            |> Expect.equal 1
+                ]
+
+
+withTarget : String -> Checkpoint.Checkpoint -> Checkpoint.Checkpoint
+withTarget clockText checkpoint =
+    { checkpoint | target = Clock.fromString clockText }
+
+
+gunTime : Clock.Clock
+gunTime =
+    clockAt "05:30"
+
+
+clockAt : String -> Clock.Clock
+clockAt text =
+    Clock.fromString text |> Maybe.withDefault Clock.midnight
+
+
+{-| Races that cross midnight, or run into a second day. Each cutoff is
+anchored to the one before it, so the sheet stays in order however many
+midnights pass under it.
+-}
+overnightSuite : Test
+overnightSuite =
+    case
+        Route.fromSamples
+            [ { lat = 10.5, lon = 107.1, ele = 0 }
+            , { lat = 10.509, lon = 107.1, ele = 0 }
+            ]
+            []
+    of
+        Err _ ->
+            test "overnight fixture route builds" <| \_ -> Expect.fail "two points should make a route"
+
+        Ok course ->
+            let
+                planFrom startText stations =
+                    Plan.fromDraft
+                        { route = Just course
+                        , checkpoints =
+                            Checkpoint.startLine (Checkpoint.idFromInt 0) (clockAt startText)
+                                :: stations
+                        , date = DateOnly.fromParts 2026 8 25
+                        , time = Clock.fromString startText
+                        , nextId = 9
+                        , name = ""
+                        , climbRatio = 1000
+                        }
+
+                orderIssues result =
+                    case result of
+                        Err _ ->
+                            [ "PLAN DID NOT BUILD" ]
+
+                        Ok plan ->
+                            Plan.issues Time.utc plan
+                                |> List.map Plan.issueText
+                                |> List.filter (String.contains "không nằm sau")
+            in
+            describe "Cutoffs follow the race across midnight"
+                [ test "a 22:00 start with a 02:00 cutoff stays in order" <|
+                    \_ ->
+                        orderIssues
+                            (planFrom "22:00"
+                                [ Checkpoint.station (Checkpoint.idFromInt 1) "A" (Km.fromFloat 0.3) (ClosesAt (clockAt "23:30"))
+                                , Checkpoint.finishLine (Checkpoint.idFromInt 2) (Km.fromFloat 0.9) (ClosesAt (clockAt "02:00"))
+                                ]
+                            )
+                            |> Expect.equal []
+                , test "a cutoff on the second morning stays in order" <|
+                    \_ ->
+                        orderIssues
+                            (planFrom "05:30"
+                                [ Checkpoint.station (Checkpoint.idFromInt 1) "A" (Km.fromFloat 0.3) (ClosesAt (clockAt "20:00"))
+                                , Checkpoint.finishLine (Checkpoint.idFromInt 2) (Km.fromFloat 0.9) (ClosesAt (clockAt "08:00"))
+                                ]
+                            )
+                            |> Expect.equal []
+                , test "a checkpoint a full day after the start is valid" <|
+                    \_ ->
+                        orderIssues
+                            (planFrom "22:00"
+                                [ Checkpoint.station (Checkpoint.idFromInt 1) "A" (Km.fromFloat 0.3) (ClosesAt (clockAt "23:00"))
+                                , Checkpoint.finishLine (Checkpoint.idFromInt 2) (Km.fromFloat 0.9) (ClosesAt (clockAt "22:00"))
+                                ]
+                            )
+                            |> Expect.equal []
+                , test "a stale start cutoff cannot poison the anchor" <|
+                    -- The draft's start row says 00:00 because the course was
+                    -- loaded before the start time was typed; the plan pins it.
+                    \_ ->
+                        (case
+                            Plan.fromDraft
+                                { route = Just course
+                                , checkpoints =
+                                    [ Checkpoint.startLine (Checkpoint.idFromInt 0) (clockAt "00:00")
+                                    , Checkpoint.station (Checkpoint.idFromInt 1) "A" (Km.fromFloat 0.3) (ClosesAt (clockAt "10:30"))
+                                    , Checkpoint.finishLine (Checkpoint.idFromInt 2) (Km.fromFloat 0.9) (ClosesAt (clockAt "14:00"))
+                                    ]
+                                , date = DateOnly.fromParts 2026 8 29
+                                , time = Clock.fromString "02:00"
+                                , nextId = 9
+                                , name = ""
+                                , climbRatio = 1000
+                                }
+                         of
+                            Err _ ->
+                                [ "PLAN DID NOT BUILD" ]
+
+                            Ok plan ->
+                                Plan.issues Time.utc plan
+                                    |> List.filter Plan.isBlocking
+                                    |> List.map Plan.issueText
+                        )
+                            |> Expect.equal []
+                , test "targets ride the same day as their cutoffs" <|
+                    \_ ->
+                        (case
+                            planFrom "22:00"
+                                [ withTarget "23:00" (Checkpoint.station (Checkpoint.idFromInt 1) "A" (Km.fromFloat 0.3) (ClosesAt (clockAt "23:30")))
+                                , withTarget "01:30" (Checkpoint.finishLine (Checkpoint.idFromInt 2) (Km.fromFloat 0.9) (ClosesAt (clockAt "02:00")))
+                                ]
+                         of
+                            Err _ ->
+                                [ "PLAN DID NOT BUILD" ]
+
+                            Ok plan ->
+                                Plan.issues Time.utc plan
+                                    |> List.map Plan.issueText
+                                    |> List.filter (String.contains "Mục tiêu")
+                        )
+                            |> Expect.equal []
+                ]
+
+
+paceUrgency : Float -> Float -> Float -> Segment.Urgency
+paceUrgency minutesLeft km ascentMetres =
+    Segment.urgency 1000 (segmentFor minutesLeft km ascentMetres)
+
+
+segmentFor : Float -> Float -> Float -> Segment.Segment
+segmentFor minutesLeft km ascentMetres =
+    { distance = Distance.fromKilometers km
+    , ascent = Elevation.fromMeters ascentMetres
+    , descent = Elevation.fromMeters 0
+    , cutoff =
+        Just
+            { closesAt = Time.millisToPosix 0
+            , remaining = Duration.fromMinutes minutesLeft
+            }
+    }
 
 
 trustFor : Float -> Float -> Bool

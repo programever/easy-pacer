@@ -300,6 +300,30 @@ applyTyped model field raw draft =
             , blank || parsed /= Nothing
             )
 
+        TargetOf id ->
+            let
+                parsed =
+                    Clock.fromString raw
+            in
+            ( { draft | checkpoints = List.map (setTargetIf id parsed) draft.checkpoints }
+            , blank || parsed /= Nothing
+            )
+
+        ClimbField ->
+            case ( blank, String.toInt raw ) of
+                ( True, _ ) ->
+                    ( { draft | climbRatio = 1000 }, True )
+
+                ( False, Just value ) ->
+                    if value > 0 then
+                        ( { draft | climbRatio = value }, True )
+
+                    else
+                        ( draft, False )
+
+                ( False, Nothing ) ->
+                    ( draft, False )
+
 
 renameIf : Checkpoint.Id -> String -> Checkpoint -> Checkpoint
 renameIf id name checkpoint =
@@ -328,6 +352,15 @@ setCutoffIf id cutoff checkpoint =
         checkpoint
 
 
+setTargetIf : Checkpoint.Id -> Maybe Clock.Clock -> Checkpoint -> Checkpoint
+setTargetIf id target checkpoint =
+    if checkpoint.id == id then
+        { checkpoint | target = target }
+
+    else
+        checkpoint
+
+
 {-| User facing. What blur says when the box held something that was not a
 value. Matches the placeholder, so the fix is on screen already.
 -}
@@ -345,6 +378,12 @@ rejectedText field =
 
         CutoffOf _ ->
             "Giờ chưa đúng — nhập kiểu 05:30."
+
+        TargetOf _ ->
+            "Giờ chưa đúng — nhập kiểu 05:30."
+
+        ClimbField ->
+            "Số mét chưa đúng — nhập số nguyên dương, ví dụ 1000."
 
 
 {-| Start first, then the stations in the order given, then the finish. The
@@ -656,6 +695,13 @@ checkpointSection state =
             state.draft.checkpoints
         )
     , Form.miniButton "Thêm một trạm" (SettingChanged AddStation)
+    , Form.field "Quy đổi dốc: 100 m leo bằng bao nhiêu mét đường bằng?"
+        (Form.typedNumberField "1000"
+            (shown state ClimbField (String.fromInt state.draft.climbRatio))
+            (typedInto ClimbField)
+            done
+        )
+    , Theme.note "App dùng số này để tính màu cho trạng thái COT khi chạy."
     ]
 
 
@@ -675,7 +721,7 @@ checkpointCard state edges checkpoint =
                 :: controls edges checkpoint
             )
         , div [ class "r2" ]
-            [ div []
+            (div []
                 [ Html.label [ class "lbl" ] [ text "Km" ]
                 , if checkpoint.role == Station then
                     Form.typedNumberField "km"
@@ -686,21 +732,44 @@ checkpointCard state edges checkpoint =
                   else
                     div [ class "km-lock" ] [ text ("km " ++ Km.toString checkpoint.km) ]
                 ]
-            , div []
-                [ Html.label [ class "lbl" ]
-                    [ text (cutoffLabel checkpoint) ]
-                , if checkpoint.role == StartLine then
-                    div [ class "km-lock" ] [ text "Theo bước 2" ]
+                :: div []
+                    [ Html.label [ class "lbl" ]
+                        [ text (cutoffLabel checkpoint) ]
+                    , if checkpoint.role == StartLine then
+                        div [ class "km-lock" ] [ text "Theo bước 2" ]
 
-                  else
-                    Form.clockField "05:30"
-                        (shown state
-                            (CutoffOf checkpoint.id)
-                            (Maybe.map Clock.toString (Checkpoint.cutoffClock checkpoint) |> Maybe.withDefault "")
-                        )
-                        (typedInto (CutoffOf checkpoint.id))
-                        done
-                ]
+                      else
+                        Form.clockField "05:30"
+                            (shown state
+                                (CutoffOf checkpoint.id)
+                                (Maybe.map Clock.toString (Checkpoint.cutoffClock checkpoint) |> Maybe.withDefault "")
+                            )
+                            (typedInto (CutoffOf checkpoint.id))
+                            done
+                    ]
+                :: targetColumn state checkpoint
+            )
+        ]
+
+
+{-| The runner's own target time. The start has no target: it is when the gun
+goes.
+-}
+targetColumn : SetupState -> Checkpoint -> List (Html Msg)
+targetColumn state checkpoint =
+    if checkpoint.role == StartLine then
+        []
+
+    else
+        [ div []
+            [ Html.label [ class "lbl" ] [ text "Mục tiêu" ]
+            , Form.clockField "05:30"
+                (shown state
+                    (TargetOf checkpoint.id)
+                    (Maybe.map Clock.toString checkpoint.target |> Maybe.withDefault "")
+                )
+                (typedInto (TargetOf checkpoint.id))
+                done
             ]
         ]
 
@@ -723,7 +792,7 @@ cutoffLabel checkpoint =
             "Giờ xuất phát"
 
         FinishLine ->
-            "COT hoặc mục tiêu"
+            "COT (để trống nếu không có)"
 
         Station ->
             "COT (để trống nếu không có)"

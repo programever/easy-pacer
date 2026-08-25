@@ -25,7 +25,9 @@ anywhere, and needs no account. It is served at
 - Stations are ordered by hand with up and down buttons; seeding from the GPX
   file sorts them by km once, and the start and finish stay pinned to the ends.
 - Plan review before the start: checkpoints past the end of the course,
-  duplicates, cutoffs out of order, and legs that imply an impossible speed.
+  duplicates, cutoffs out of order, and targets that disagree with the
+  cutoffs. The start time anchors the timeline; races that cross midnight or
+  run into a second day read correctly.
 - During the race: the next checkpoint, how far, how much up and down, and
   how long until it closes, plus the full ledger of every station.
 - The elevation profile with a draggable cursor, mirrored on the course map.

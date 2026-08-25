@@ -140,6 +140,9 @@ urgencyClass level =
         Tight ->
             "warn"
 
+        Critical ->
+            "late"
+
         Missed ->
             "late"
 

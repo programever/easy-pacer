@@ -61,6 +61,7 @@ button{font-family:inherit;}
 /* Stacked controls breathe. The original set these as inline styles on each
    button; Elm only names classes, so the spacing lives here instead. */
 .step>.btn+.btn,.step>.btn+.pair,.step>div+.btn,.step>div+.pair,.sos>.sos-preview+.btn{margin-top:10px;}
+.step>.btn+.field{margin-top:14px;}
 /* A step waiting on the course: dimmed, and inert (set in the view) blocks input. */
 .step.off{opacity:.45;pointer-events:none;}
 /* The same inside a sheet: choices stack, and a quiet button spans the

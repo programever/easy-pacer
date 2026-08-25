@@ -72,6 +72,7 @@ encode draft =
           , Maybe.map (Clock.toString >> Encode.string) draft.time
                 |> Maybe.withDefault Encode.null
           )
+        , ( "climbRatio", Encode.int draft.climbRatio )
         ]
 
 
@@ -126,6 +127,14 @@ encodeCheckpoint checkpoint =
                 Just clock ->
                     Encode.string (Clock.toString clock)
           )
+        , ( "target"
+          , case checkpoint.target of
+                Nothing ->
+                    Encode.null
+
+                Just clock ->
+                    Encode.string (Clock.toString clock)
+          )
         , ( "role", Encode.string (roleToString checkpoint.role) )
         ]
 
@@ -145,13 +154,14 @@ roleToString role =
 
 decoder : Decoder Draft
 decoder =
-    Decode.map5
-        (\course checkpoints maybeDate maybeTime name ->
+    Decode.map6
+        (\course checkpoints maybeDate maybeTime name climbRatio ->
             { route = course
             , checkpoints = checkpoints
             , date = maybeDate
             , time = maybeTime
             , name = name
+            , climbRatio = climbRatio
             , nextId =
                 1 + (List.maximum (List.map (.id >> Checkpoint.idToInt) checkpoints) |> Maybe.withDefault -1)
             }
@@ -165,6 +175,7 @@ decoder =
             |> Decode.map (Maybe.andThen Clock.fromString)
         )
         (Decode.oneOf [ Decode.field "name" Decode.string, Decode.succeed "" ])
+        (Decode.oneOf [ Decode.field "climbRatio" positiveInt, Decode.succeed 1000 ])
 
 
 isoDate : String -> Maybe DateOnly.DateOnly
@@ -213,12 +224,13 @@ waypointDecoder =
 
 checkpointDecoder : Decoder Checkpoint
 checkpointDecoder =
-    Decode.map5
-        (\id name km cutoff role ->
+    Decode.map6
+        (\id name km cutoff target role ->
             { id = Checkpoint.idFromInt id
             , name = name
             , km = Km.fromFloat km
             , cutoff = cutoff
+            , target = target
             , role = role
             , status = Checkpoint.Pending
             }
@@ -241,9 +253,27 @@ checkpointDecoder =
                             Checkpoint.ClosesAt clock
                 )
         )
+        (Decode.oneOf [ Decode.field "target" (Decode.nullable Decode.string), Decode.succeed Nothing ]
+            |> Decode.map (Maybe.andThen Clock.fromString)
+        )
         (Decode.oneOf [ Decode.field "role" Decode.string, Decode.succeed "station" ]
             |> Decode.map roleFromString
         )
+
+
+{-| A hand edited ratio of zero or less would divide the pace by nothing.
+-}
+positiveInt : Decoder Int
+positiveInt =
+    Decode.int
+        |> Decode.map
+            (\value ->
+                if value > 0 then
+                    value
+
+                else
+                    1000
+            )
 
 
 roleFromString : String -> Checkpoint.Role

@@ -41,11 +41,15 @@ type Id
     = Id Int
 
 
+{-| `cutoff` is the organiser's deadline; `target` is the runner's own plan
+for the same clock, optional and theirs to break.
+-}
 type alias Checkpoint =
     { id : Id
     , name : String
     , km : Km
     , cutoff : Cutoff
+    , target : Maybe Clock
     , role : Role
     , status : Status
     }
@@ -91,6 +95,7 @@ startLine id time =
     , name = "Xuất phát"
     , km = Km.start
     , cutoff = ClosesAt time
+    , target = Nothing
     , role = StartLine
     , status = Pending
     }
@@ -102,6 +107,7 @@ finishLine id km cutoff =
     , name = "Về đích"
     , km = km
     , cutoff = cutoff
+    , target = Nothing
     , role = FinishLine
     , status = Pending
     }
@@ -113,6 +119,7 @@ station id name km cutoff =
     , name = name
     , km = km
     , cutoff = cutoff
+    , target = Nothing
     , role = Station
     , status = Pending
     }

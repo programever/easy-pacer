@@ -6,9 +6,10 @@ checkpoints and their cutoffs.
 Everything here edits a `Draft`. A `Draft` cannot be run: turning one into a
 `Plan` goes through `Plan.fromDraft`, which is also where the review lives.
 
-Stations are always shown in km order. There is no manual ordering and no
-warning that the list disagrees with the numbers, because the list cannot
-disagree with the numbers: it is re-sorted the moment a km box loses focus.
+Stations stay in the order the runner arranges them: the up and down buttons
+on a card move it one place, and the start and finish are pinned to the ends.
+The only automatic km sort is seeding stations from the GPX file's waypoints —
+those arrive unordered and the runner has not arranged anything yet.
 
 -}
 
@@ -28,6 +29,7 @@ import File.Download
 import File.Select
 import Html exposing (Html, div, text)
 import Html.Attributes exposing (class, classList)
+import Html.Keyed
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Runtime.Ports as Ports
@@ -67,16 +69,21 @@ update msg state model =
             ( withDraft (seedFromWaypoints draft) state model, Cmd.none )
 
         AddStation ->
+            let
+                ( finishes, upToFinish ) =
+                    List.partition (\checkpoint -> checkpoint.role == FinishLine) draft.checkpoints
+            in
             ( withDraft
                 { draft
                     | checkpoints =
-                        draft.checkpoints
+                        upToFinish
                             ++ [ Checkpoint.station
                                     (Checkpoint.idFromInt draft.nextId)
                                     ""
                                     Km.start
                                     NoCutoff
                                ]
+                            ++ finishes
                     , nextId = draft.nextId + 1
                 }
                 state
@@ -90,6 +97,22 @@ update msg state model =
                     | checkpoints =
                         List.filter (\checkpoint -> checkpoint.id /= id) draft.checkpoints
                 }
+                state
+                model
+            , Cmd.none
+            )
+
+        MoveStationUp id ->
+            ( withDraft
+                { draft | checkpoints = Checkpoint.moveUp id draft.checkpoints }
+                state
+                model
+            , Cmd.none
+            )
+
+        MoveStationDown id ->
+            ( withDraft
+                { draft | checkpoints = Checkpoint.moveDown id draft.checkpoints }
                 state
                 model
             , Cmd.none
@@ -120,12 +143,7 @@ update msg state model =
         CommitTyping ->
             let
                 committed =
-                    withSetup
-                        { state
-                            | draft = { draft | checkpoints = orderForEditing draft.checkpoints }
-                            , typing = Nothing
-                        }
-                        model
+                    withSetup { state | typing = Nothing } model
             in
             case state.typing of
                 Just typing ->
@@ -204,7 +222,7 @@ update msg state model =
         PlanTextRead contents ->
             case Decode.decodeString PlanFile.decoder contents of
                 Ok loaded ->
-                    ( withDraft { loaded | checkpoints = orderForEditing loaded.checkpoints, name = draft.name } state model
+                    ( withDraft { loaded | checkpoints = pinEnds loaded.checkpoints, name = draft.name } state model
                     , Cmd.none
                     )
 
@@ -329,21 +347,16 @@ rejectedText field =
             "Giờ chưa đúng — nhập kiểu 05:30."
 
 
-{-| Start first, then stations by km, then the finish. A station with no km yet
-stays where it was added, at the end of the stations, rather than sorting to
-the top as a zero would; the runner is about to type its km and should not
-have to chase the card.
+{-| Start first, then the stations in the order given, then the finish. The
+stations are never sorted here: their order belongs to the runner.
 -}
-orderForEditing : List Checkpoint -> List Checkpoint
-orderForEditing checkpoints =
+pinEnds : List Checkpoint -> List Checkpoint
+pinEnds checkpoints =
     let
         withRole role =
             List.filter (\checkpoint -> checkpoint.role == role) checkpoints
-
-        ( placed, unplaced ) =
-            List.partition (\station -> Km.toFloat station.km > 0) (withRole Station)
     in
-    withRole StartLine ++ Checkpoint.sortByKm placed ++ unplaced ++ withRole FinishLine
+    withRole StartLine ++ withRole Station ++ withRole FinishLine
 
 
 reviewIssues : Model -> Draft -> List Issue
@@ -428,9 +441,9 @@ seedFromWaypoints draft =
             in
             { draft
                 | checkpoints =
-                    orderForEditing
+                    pinEnds
                         (List.filter (\checkpoint -> checkpoint.role /= Station) draft.checkpoints
-                            ++ seeded
+                            ++ Checkpoint.sortByKm seeded
                         )
                 , nextId = draft.nextId + List.length seeded
             }
@@ -442,29 +455,49 @@ seedFromWaypoints draft =
 
 view : SetupState -> Html Msg
 view state =
+    let
+        hasCourse =
+            state.draft.route /= Nothing
+    in
     div []
-        [ step "Bước 1"
+        [ step True
+            "Bước 1"
             "Nạp đường chạy"
             "File GPX của giải. App đọc luôn cự ly, độ cao và các trạm nếu file có sẵn."
             (courseSection state)
-        , step "Bước 2"
+        , step hasCourse
+            "Bước 2"
             "Ngày giờ xuất phát"
             "Đặt trước vài ngày cũng được. Giờ đóng trạm sau nửa đêm sẽ tự tính sang ngày hôm sau."
             (startSection state)
-        , step "Bước 3"
+        , step hasCourse
+            "Bước 3"
             "Các trạm và giờ đóng trạm"
-            "Điền COT theo đúng bảng của BTC. Trạm nước thường không có giờ đóng — cứ để trống ô giờ. Các trạm tự xếp theo số km."
+            "Điền COT theo đúng bảng của BTC. Trạm nước thường không có giờ đóng — cứ để trống ô giờ. Dùng nút ↑ ↓ để xếp thứ tự trạm."
             (checkpointSection state)
-        , step "Bước 4"
+        , step True
+            "Bước 4"
             "Bắt đầu"
             (readySummary state.draft)
             startButtons
         ]
 
 
-step : String -> String -> String -> List (Html Msg) -> Html Msg
-step number title description body =
-    div [ class "step" ]
+{-| A step that needs the course first stays visible so the runner can see
+what is coming, but greyed out and inert until a GPX file or a saved plan
+brings a route in. `inert` blocks clicks, taps and keyboard focus alike.
+-}
+step : Bool -> String -> String -> String -> List (Html Msg) -> Html Msg
+step enabled number title description body =
+    div
+        (classList [ ( "step", True ), ( "off", not enabled ) ]
+            :: (if enabled then
+                    []
+
+                else
+                    [ Html.Attributes.attribute "inert" "" ]
+               )
+        )
         (div [ class "step-no" ] [ text number ]
             :: Theme.sectionTitle title
             :: Theme.note description
@@ -596,16 +629,38 @@ startSection state =
     ]
 
 
+{-| Keyed by checkpoint id: when a card moves, its DOM node moves with it, so
+a focused input keeps its focus and its half-typed text through the move.
+-}
 checkpointSection : SetupState -> List (Html Msg)
 checkpointSection state =
-    [ div [ class "cp-edit" ]
-        (List.map (checkpointCard state) state.draft.checkpoints)
+    let
+        stationIds =
+            state.draft.checkpoints
+                |> List.filter (\checkpoint -> checkpoint.role == Station)
+                |> List.map .id
+
+        edges checkpoint =
+            { atTop = List.head stationIds == Just checkpoint.id
+            , atBottom = List.head (List.reverse stationIds) == Just checkpoint.id
+            }
+    in
+    [ Html.Keyed.node "div"
+        [ class "cp-edit" ]
+        (List.map
+            (\checkpoint ->
+                ( Checkpoint.idToString checkpoint.id
+                , checkpointCard state (edges checkpoint) checkpoint
+                )
+            )
+            state.draft.checkpoints
+        )
     , Form.miniButton "Thêm một trạm" (SettingChanged AddStation)
     ]
 
 
-checkpointCard : SetupState -> Checkpoint -> Html Msg
-checkpointCard state checkpoint =
+checkpointCard : SetupState -> { atTop : Bool, atBottom : Bool } -> Checkpoint -> Html Msg
+checkpointCard state edges checkpoint =
     div [ class "cp-card", classList [ ( "pinned", checkpoint.role /= Station ) ] ]
         [ div [ class "r1" ]
             (Form.textField
@@ -617,7 +672,7 @@ checkpointCard state checkpoint =
                 )
                 checkpoint.name
                 (SettingChanged << EditName checkpoint.id)
-                :: controls checkpoint
+                :: controls edges checkpoint
             )
         , div [ class "r2" ]
             [ div []
@@ -674,8 +729,8 @@ cutoffLabel checkpoint =
             "COT (để trống nếu không có)"
 
 
-controls : Checkpoint -> List (Html Msg)
-controls checkpoint =
+controls : { atTop : Bool, atBottom : Bool } -> Checkpoint -> List (Html Msg)
+controls edges checkpoint =
     case checkpoint.role of
         StartLine ->
             [ Html.span [ class "cp-tag" ] [ text "XP" ] ]
@@ -684,7 +739,10 @@ controls checkpoint =
             [ Html.span [ class "cp-tag" ] [ text "ĐÍCH" ] ]
 
         Station ->
-            [ Form.iconButton "✕" False (SettingChanged (RemoveStation checkpoint.id)) ]
+            [ Form.iconButton "↑" edges.atTop (SettingChanged (MoveStationUp checkpoint.id))
+            , Form.iconButton "↓" edges.atBottom (SettingChanged (MoveStationDown checkpoint.id))
+            , Form.iconButton "✕" False (SettingChanged (RemoveStation checkpoint.id))
+            ]
 
 
 readySummary : Draft -> String

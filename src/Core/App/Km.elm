@@ -2,13 +2,10 @@ module Core.App.Km exposing
     ( Km
     , advance
     , clampTo
-    , compare
     , difference
     , fromFloat
     , isAtOrBefore
     , isBefore
-    , max
-    , min
     , start
     , toFloat
     , toString
@@ -71,21 +68,6 @@ isAtOrBefore (Km limit) (Km value) =
 clampTo : Km -> Km -> Km
 clampTo (Km limit) (Km value) =
     Km (clamp 0 limit value)
-
-
-compare : Km -> Km -> Order
-compare (Km a) (Km b) =
-    Basics.compare a b
-
-
-min : Km -> Km -> Km
-min (Km a) (Km b) =
-    Km (Basics.min a b)
-
-
-max : Km -> Km -> Km
-max (Km a) (Km b) =
-    Km (Basics.max a b)
 
 
 {-| User facing, one decimal place.

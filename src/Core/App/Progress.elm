@@ -12,7 +12,6 @@ module Core.App.Progress exposing
     , fromStored
     , km
     , lastFix
-    , lastOnRoute
     , source
     , toStored
     , updatedAt
@@ -152,11 +151,6 @@ lastFix (Progress state) =
 
         FromRunner ->
             List.head state.breadcrumbs
-
-
-lastOnRoute : Progress -> Maybe LatLon
-lastOnRoute (Progress state) =
-    state.lastOnRoute
 
 
 {-| Measured, never modelled: distance covered divided by time elapsed. Used

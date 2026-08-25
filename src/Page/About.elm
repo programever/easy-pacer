@@ -1,4 +1,4 @@
-module Page.About exposing (repositoryUrl, view)
+module Page.About exposing (view)
 
 {-| What the app is, what it does, and where to say something about it.
 

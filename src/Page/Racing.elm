@@ -673,7 +673,7 @@ locatePanel race =
                 , fix = Progress.lastFix race.progress
                 , lost = currentState race == OffRoute
                 , uncertain = currentState race == Uncertain
-                , snapTo = Nothing
+                , snapTo = snapTarget race
                 , cursor = cursorKm race
                 , breadcrumbs = List.map .at (Progress.breadcrumbs race.progress)
                 }
@@ -712,6 +712,21 @@ elevationCard race =
         , div [ class "scrub-read", classList [ ( "live", race.scrub /= NotScrubbing ) ] ]
             [ text (scrubReadout race) ]
         ]
+
+
+{-| The nearest point of the course to the last GPS fix: where the dashed
+line home on the map points. The map only draws it when the runner is lost.
+-}
+snapTarget : RaceState -> Maybe LatLon.LatLon
+snapTarget race =
+    case Progress.source race.progress of
+        FromRunner ->
+            Nothing
+
+        FromGps fix ->
+            Position.candidates (Plan.route race.plan) fix.at
+                |> List.head
+                |> Maybe.map Position.candidateSnap
 
 
 currentState : RaceState -> RouteState
@@ -886,7 +901,7 @@ dock race =
         , if race.kmEntryOpen then
             div [ class "km-entry" ]
                 [ Form.numberField "Đã chạy bao nhiêu km?" race.kmEntryText (RacingChanged << EditKmEntry)
-                , Form.solidButton "Cập nhật" (RacingChanged SubmitKmEntry)
+                , Form.solidButton "Cập nhật" False (RacingChanged SubmitKmEntry)
                 ]
 
           else

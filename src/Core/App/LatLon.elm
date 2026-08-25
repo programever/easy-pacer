@@ -1,6 +1,6 @@
 module Core.App.LatLon exposing
     ( Bearing
-    , Compass(..)
+    , Compass
     , LatLon
     , Plane
     , Projection

@@ -1,4 +1,4 @@
-module Core.App.Sos exposing (mapsLink, message)
+module Core.App.Sos exposing (message)
 
 {-| The message a lost runner sends to the organisers.
 

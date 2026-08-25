@@ -13,11 +13,12 @@ module Core.App.Checkpoint exposing
     , idToString
     , isPassed
     , isPending
+    , moveDown
+    , moveUp
     , passedAt
     , sortByKm
     , startLine
     , station
-    , syncAll
     , syncStatus
     )
 
@@ -187,6 +188,38 @@ sortByKm =
     List.sortBy (\checkpoint -> Km.toFloat checkpoint.km)
 
 
+{-| Swap a station with the one just before it in the list. Only stations
+move: the start and finish never move, and a station never crosses them.
+An id at the top, or one that is not a station, leaves the list untouched.
+-}
+moveUp : Id -> List Checkpoint -> List Checkpoint
+moveUp id checkpoints =
+    case checkpoints of
+        first :: second :: rest ->
+            if second.id == id && first.role == Station && second.role == Station then
+                second :: first :: rest
+
+            else
+                first :: moveUp id (second :: rest)
+
+        _ ->
+            checkpoints
+
+
+moveDown : Id -> List Checkpoint -> List Checkpoint
+moveDown id checkpoints =
+    case checkpoints of
+        first :: second :: rest ->
+            if first.id == id && first.role == Station && second.role == Station then
+                second :: first :: rest
+
+            else
+                first :: moveDown id (second :: rest)
+
+        _ ->
+            checkpoints
+
+
 {-| Status is derived from progress in BOTH directions. Correcting the distance
 downwards has to un-pass the checkpoints beyond it; the previous version only
 ever marked forwards, so a mistyped number left phantom passed stations behind
@@ -203,8 +236,3 @@ syncStatus reached now checkpoint =
 
         _ ->
             checkpoint
-
-
-syncAll : Km -> Time.Posix -> List Checkpoint -> List Checkpoint
-syncAll reached now =
-    List.map (syncStatus reached now)

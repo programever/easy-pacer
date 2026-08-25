@@ -38,9 +38,9 @@ button content toMsg =
     Html.button [ class "btn", onClick toMsg ] [ text content ]
 
 
-solidButton : String -> msg -> Html msg
-solidButton content toMsg =
-    Html.button [ class "btn solid", onClick toMsg ] [ text content ]
+solidButton : String -> Bool -> msg -> Html msg
+solidButton content disabled toMsg =
+    Html.button [ class "btn solid", Attr.disabled disabled, onClick toMsg ] [ text content ]
 
 
 tallButton : String -> msg -> Html msg

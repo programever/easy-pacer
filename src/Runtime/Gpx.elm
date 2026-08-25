@@ -1,4 +1,4 @@
-module Runtime.Gpx exposing (Error(..), Payload, decoder, errorMessage)
+module Runtime.Gpx exposing (Error, Payload, decoder, errorMessage)
 
 {-| Decoding what the GPX port sends back. The browser did the XML; this decides
 whether what came back is usable.
@@ -15,9 +15,11 @@ type alias Payload =
     }
 
 
+{-| The port's error text stays on the JS side of the fence: the user-facing
+message is decided here and does not repeat browser internals.
+-}
 type Error
-    = NotGpx
-    | Malformed String
+    = Malformed
 
 
 decoder : Decoder (Result Error Payload)
@@ -29,12 +31,7 @@ decoder =
                     Decode.map Ok payloadDecoder
 
                 else
-                    Decode.map (Err << Malformed)
-                        (Decode.oneOf
-                            [ Decode.field "error" Decode.string
-                            , Decode.succeed "unknown"
-                            ]
-                        )
+                    Decode.succeed (Err Malformed)
             )
 
 
@@ -73,8 +70,5 @@ waypointDecoder =
 errorMessage : Error -> String
 errorMessage error =
     case error of
-        NotGpx ->
-            "Không đọc được file này — kiểm tra lại xem có đúng GPX không."
-
-        Malformed _ ->
+        Malformed ->
             "File GPX bị lỗi định dạng, app không đọc được."

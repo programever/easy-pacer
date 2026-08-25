@@ -155,9 +155,6 @@ step msg model =
                 _ ->
                     ( notify "Không đọc được file GPX." model, Cmd.none )
 
-        DismissToast ->
-            ( { model | toast = Nothing }, Cmd.none )
-
         ShowAbout ->
             ( { model | dialog = Just About }, Cmd.none )
 
@@ -266,7 +263,10 @@ dialogLayer model =
                     ++ [ Form.pair
                             (Form.button "Quay lại sửa" CloseDialog
                                 :: (if canStart then
+                                        -- Blocking issues make starting impossible, so the
+                                        -- override only overrides advisories.
                                         [ Form.solidButton "Vẫn bắt đầu"
+                                            (List.any Plan.isBlocking issues)
                                             (SettingChanged Action.ConfirmStartRace)
                                         ]
 

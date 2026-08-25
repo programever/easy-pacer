@@ -15,7 +15,6 @@ module State exposing
     , fitAll
     , fitTo
     , initialModel
-    , mapView
     , noGesture
     , pointerDown
     , pointerMove
@@ -192,11 +191,6 @@ setup draft =
 noGesture : MapGesture
 noGesture =
     { pointers = Dict.empty, pinch = Nothing }
-
-
-mapView : Route -> MapView
-mapView route =
-    fitAll route
 
 
 fitAll : Route -> MapView

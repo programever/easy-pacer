@@ -1,8 +1,7 @@
 module Core.App.Plan exposing
     ( Draft
-    , Issue(..)
+    , Issue
     , Plan
-    , ahead
     , checkpoints
     , cutoffMoment
     , date
@@ -113,29 +112,29 @@ draftWithRoute newRoute draft =
         startTime =
             Maybe.withDefault Clock.midnight draft.time
 
-        added =
-            (if hasRole Checkpoint.StartLine then
+        addedStart =
+            if hasRole Checkpoint.StartLine then
                 []
 
-             else
+            else
                 [ Checkpoint.startLine (Checkpoint.idFromInt withRoute.nextId) startTime ]
-            )
-                ++ (if hasRole Checkpoint.FinishLine then
-                        []
 
-                    else
-                        [ Checkpoint.finishLine
-                            (Checkpoint.idFromInt (withRoute.nextId + 1))
-                            (Route.totalKm newRoute)
-                            NoCutoff
-                        ]
-                   )
+        addedFinish =
+            if hasRole Checkpoint.FinishLine then
+                []
+
+            else
+                [ Checkpoint.finishLine
+                    (Checkpoint.idFromInt (withRoute.nextId + List.length addedStart))
+                    (Route.totalKm newRoute)
+                    NoCutoff
+                ]
     in
     { withRoute
         | checkpoints =
-            (draft.checkpoints ++ added)
+            (addedStart ++ draft.checkpoints ++ addedFinish)
                 |> List.map (pinToRoute newRoute)
-        , nextId = withRoute.nextId + List.length added
+        , nextId = withRoute.nextId + List.length addedStart + List.length addedFinish
     }
 
 
@@ -154,11 +153,14 @@ pinToRoute currentRoute checkpoint =
             checkpoint
 
 
+{-| The checkpoints keep the order the runner arranged them in. Anything in
+race mode that needs the physical course order sorts by km itself.
+-}
 fromDraft : Draft -> Result (NonEmpty Issue) Plan
 fromDraft draft =
     case ( draft.route, draft.date, draft.time ) of
         ( Just currentRoute, Just currentDate, Just currentTime ) ->
-            case NonEmpty.fromList (Checkpoint.sortByKm draft.checkpoints) of
+            case NonEmpty.fromList draft.checkpoints of
                 Nothing ->
                     Err (NonEmpty.singleton (Blocking "Kế hoạch chưa có trạm nào."))
 

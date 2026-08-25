@@ -61,6 +61,8 @@ button{font-family:inherit;}
 /* Stacked controls breathe. The original set these as inline styles on each
    button; Elm only names classes, so the spacing lives here instead. */
 .step>.btn+.btn,.step>.btn+.pair,.step>div+.btn,.step>div+.pair,.sos>.sos-preview+.btn{margin-top:10px;}
+/* A step waiting on the course: dimmed, and inert (set in the view) blocks input. */
+.step.off{opacity:.45;pointer-events:none;}
 /* The same inside a sheet: choices stack, and a quiet button spans the
    sheet like the others so the stack reads as one list. */
 .sheet>.btn+.btn,.sheet>.choice+.btn,.sheet>.issue+.pair{margin-top:10px;}
@@ -133,6 +135,7 @@ label.lbl{display:block;font-size:12px;color:var(--muted);margin-bottom:5px;}
   display:flex;align-items:center;justify-content:center;
 }
 .icon-btn:active{border-color:var(--tape);color:var(--tape);}
+.icon-btn:disabled{opacity:.35;cursor:default;}
 .km-lock{font-family:var(--mono);font-size:13px;color:var(--muted);padding:10px 0;}
 
 /* ---------- tabs ---------- */

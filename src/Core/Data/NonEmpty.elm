@@ -1,13 +1,10 @@
 module Core.Data.NonEmpty exposing
     ( NonEmpty
-    , cons
     , filterToList
-    , foldl
     , fromList
     , head
     , length
     , map
-    , minimumBy
     , singleton
     , sortBy
     , tail
@@ -26,11 +23,6 @@ type NonEmpty a
 singleton : a -> NonEmpty a
 singleton value =
     NonEmpty value []
-
-
-cons : a -> NonEmpty a -> NonEmpty a
-cons value (NonEmpty first rest) =
-    NonEmpty value (first :: rest)
 
 
 fromList : List a -> Maybe (NonEmpty a)
@@ -71,25 +63,6 @@ map f (NonEmpty first rest) =
 filterToList : (a -> Bool) -> NonEmpty a -> List a
 filterToList predicate nonEmpty =
     List.filter predicate (toList nonEmpty)
-
-
-foldl : (a -> b -> b) -> b -> NonEmpty a -> b
-foldl step initial nonEmpty =
-    List.foldl step initial (toList nonEmpty)
-
-
-minimumBy : (a -> Float) -> NonEmpty a -> a
-minimumBy score (NonEmpty first rest) =
-    List.foldl
-        (\candidate best ->
-            if score candidate < score best then
-                candidate
-
-            else
-                best
-        )
-        first
-        rest
 
 
 sortBy : (a -> comparable) -> NonEmpty a -> NonEmpty a

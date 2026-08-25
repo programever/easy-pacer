@@ -55,24 +55,43 @@ suite =
                         ( cutoffOf station1 after, after.toast /= Nothing )
                         ( Nothing, True )
             ]
-        , describe "stations keep themselves in km order"
-            [ test "a station typed past the finish moves to the end on blur" <|
+        , describe "the runner arranges the stations by hand"
+            [ test "typing a km past the next station does not move the card" <|
                 \_ ->
                     typed (KmOf station1) [ "9" ]
                         |> step CommitTyping
-                        |> stationOrder
-                        |> Expect.equal [ "B", "A" ]
-            , test "but not while the km is still being typed" <|
-                \_ ->
-                    typed (KmOf station1) [ "9" ]
                         |> stationOrder
                         |> Expect.equal [ "A", "B" ]
-            , test "a station with no km yet stays at the bottom, not sorted to the top" <|
+            , test "the down button swaps a station with the one below" <|
+                \_ ->
+                    step (MoveStationDown station1) start
+                        |> stationOrder
+                        |> Expect.equal [ "B", "A" ]
+            , test "the up button swaps a station with the one above" <|
+                \_ ->
+                    step (MoveStationUp station2) start
+                        |> stationOrder
+                        |> Expect.equal [ "B", "A" ]
+            , test "the top station cannot move above the start" <|
+                \_ ->
+                    step (MoveStationUp station1) start
+                        |> stationOrder
+                        |> Expect.equal [ "A", "B" ]
+            , test "the bottom station cannot move below the finish" <|
+                \_ ->
+                    step (MoveStationDown station2) start
+                        |> stationOrder
+                        |> Expect.equal [ "A", "B" ]
+            , test "a new station joins at the end of the stations" <|
                 \_ ->
                     step AddStation start
-                        |> step CommitTyping
                         |> stationOrder
                         |> Expect.equal [ "A", "B", "" ]
+            , test "the finish is still last after adding a station" <|
+                \_ ->
+                    step AddStation start
+                        |> lastRole
+                        |> Expect.equal (Just FinishLine)
             ]
         ]
 
@@ -187,6 +206,13 @@ cutoffOf id model =
             )
         |> Maybe.andThen Checkpoint.cutoffClock
         |> Maybe.map Clock.toString
+
+
+lastRole : Model -> Maybe Role
+lastRole model =
+    setupState model
+        |> Maybe.andThen (\state -> List.head (List.reverse state.draft.checkpoints))
+        |> Maybe.map .role
 
 
 stationOrder : Model -> List String

@@ -3,14 +3,12 @@ module Core.App.Position exposing
     , Resolution(..)
     , RouteState(..)
     , acceptableAccuracy
-    , acceptableDeviation
     , candidateAt
     , candidateDeviation
     , candidateKm
     , candidateSnap
     , candidates
     , isTrustworthy
-    , offRouteThreshold
     , resolve
     , routeState
     )
@@ -58,11 +56,12 @@ type RouteState
 
 
 {-| Beyond this a runner is treated as having left the course, provided the
-measurement is precise enough to say so.
+measurement is precise enough to say so, and the app switches to guiding
+them back.
 -}
 offRouteThreshold : Distance
 offRouteThreshold =
-    Distance.fromMeters 60
+    Distance.fromMeters 30
 
 
 {-| A fix must be at least this precise before it is allowed to move the

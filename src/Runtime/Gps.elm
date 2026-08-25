@@ -1,4 +1,4 @@
-module Runtime.Gps exposing (Error(..), decoder, errorMessage)
+module Runtime.Gps exposing (Error, decoder, errorMessage)
 
 {-| Decoding one position from the geolocation port.
 -}

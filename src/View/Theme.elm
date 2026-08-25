@@ -2,7 +2,6 @@ module View.Theme exposing
     ( card
     , checkpointColour
     , eyebrow
-    , hint
     , ledgerRow
     , lostColour
     , note
@@ -87,11 +86,6 @@ sectionTitle content =
 note : String -> Html msg
 note content =
     p [ class "note" ] [ text content ]
-
-
-hint : String -> Html msg
-hint content =
-    div [ class "hint" ] [ text content ]
 
 
 card : List (Attribute msg) -> List (Html msg) -> Html msg

@@ -1,5 +1,5 @@
 module Core.App.Route exposing
-    ( Error(..)
+    ( Error
     , Point
     , Route
     , Sample

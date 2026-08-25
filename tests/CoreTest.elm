@@ -5,11 +5,10 @@ course and the real race sheet, so a regression shows up as a wrong number on a
 real race rather than an abstract failure.
 -}
 
-import Core.App.Checkpoint as Checkpoint exposing (Cutoff(..), Role(..), Status(..))
+import Core.App.Checkpoint as Checkpoint exposing (Cutoff(..))
 import Core.App.Km as Km
 import Core.App.LatLon exposing (LatLon)
-import Core.App.Position as Position exposing (Resolution(..), RouteState(..))
-import Core.App.Progress as Progress
+import Core.App.Position as Position exposing (RouteState(..))
 import Core.App.Route as Route
 import Core.Data.Clock as Clock
 import Core.Data.DateOnly as DateOnly
@@ -81,6 +80,10 @@ suite =
                 \_ -> Expect.equal (stateFor 80 10) OffRoute
             , test "close in is on course whatever the noise" <|
                 \_ -> Expect.equal (stateFor 15 8) OnRoute
+            , test "thirty metres out is still on course" <|
+                \_ -> Expect.equal (stateFor 30 8) OnRoute
+            , test "just past thirty metres with a precise fix means off course" <|
+                \_ -> Expect.equal (stateFor 40 8) OffRoute
             ]
         , describe "Only a precise fix may move the milestone"
             [ test "eight metres of noise, on the course" <|

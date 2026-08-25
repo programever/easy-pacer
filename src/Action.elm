@@ -19,7 +19,6 @@ type Msg
     | RacingChanged RacingMsg
     | GpsArrived Encode.Value
     | GpxArrived Encode.Value
-    | DismissToast
     | ShowAbout
     | CloseDialog
 
@@ -31,10 +30,12 @@ type SettingMsg
     | SeedFromWaypoints
     | AddStation
     | RemoveStation Checkpoint.Id
+    | MoveStationUp Checkpoint.Id
+    | MoveStationDown Checkpoint.Id
     | EditName Checkpoint.Id String
       -- Raw text in a date, time, km or cutoff box, as typed.
     | Typed Field String
-      -- The box lost focus: stop showing raw text and put the stations in km order.
+      -- The box lost focus: stop showing raw text and settle on the parsed value.
     | CommitTyping
     | UseToday
     | UseTomorrow

@@ -804,12 +804,13 @@ targetColumn state checkpoint =
         ]
 
 
-{-| A station that has no km yet shows the placeholder, not "0.0".
+{-| A station that has no km yet shows the placeholder, not "0.0". The value is
+the exact one, not the rounded label: this text goes back into an edit box.
 -}
 kmText : Checkpoint -> String
 kmText checkpoint =
     if Km.toFloat checkpoint.km > 0 then
-        Km.toString checkpoint.km
+        Km.toEditString checkpoint.km
 
     else
         ""

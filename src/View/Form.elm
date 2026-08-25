@@ -127,7 +127,7 @@ typedNumberField hintText current toMsg onDone =
 numberAttributes : String -> String -> (String -> msg) -> List (Attribute msg)
 numberAttributes hintText current toMsg =
     [ type_ "number"
-    , Attr.step "0.1"
+    , Attr.step "any"
     , Attr.min "0"
     , Attr.attribute "inputmode" "decimal"
     , placeholder hintText

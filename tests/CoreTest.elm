@@ -49,6 +49,22 @@ suite =
             , test "rejects an impossible minute" <|
                 \_ -> Expect.equal (Clock.fromString "5:75") Nothing
             ]
+        , describe "An edit box gives back the km it was given"
+            [ test "keeps three decimals" <|
+                \_ -> Expect.equal (Km.toEditString (Km.fromFloat 8.555)) "8.555"
+            , test "keeps two" <|
+                \_ -> Expect.equal (Km.toEditString (Km.fromFloat 8.55)) "8.55"
+            , test "keeps one" <|
+                \_ -> Expect.equal (Km.toEditString (Km.fromFloat 8.5)) "8.5"
+            , test "keeps a zero that carries a digit" <|
+                \_ -> Expect.equal (Km.toEditString (Km.fromFloat 8.05)) "8.05"
+            , test "drops the decimal point from a whole number" <|
+                \_ -> Expect.equal (Km.toEditString (Km.fromFloat 40)) "40"
+            , test "trims a measured value to the metre" <|
+                \_ -> Expect.equal (Km.toEditString (Km.fromFloat 8.441149565280835)) "8.441"
+            , test "the label still rounds, which is why the two differ" <|
+                \_ -> Expect.equal (Km.toString (Km.fromFloat 8.555)) "8.6"
+            ]
         , describe "DateOnly lets a race be set up days ahead"
             [ test "day and month, year assumed" <|
                 \_ ->

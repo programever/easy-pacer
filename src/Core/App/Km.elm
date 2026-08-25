@@ -7,6 +7,7 @@ module Core.App.Km exposing
     , isAtOrBefore
     , isBefore
     , start
+    , toEditString
     , toFloat
     , toString
     )
@@ -70,7 +71,8 @@ clampTo (Km limit) (Km value) =
     Km (clamp 0 limit value)
 
 
-{-| User facing, one decimal place.
+{-| User facing, one decimal place. For reading: a runner glancing at a station
+does not want three decimals of a number they cannot run to.
 -}
 toString : Km -> String
 toString (Km value) =
@@ -79,3 +81,40 @@ toString (Km value) =
             round (value * 10)
     in
     String.fromInt (tenths // 10) ++ "." ++ String.fromInt (modBy 10 tenths)
+
+
+{-| What an edit box starts from, to the metre and with no trailing zeros.
+
+Separate from `toString` because an edit box has a duty a label does not: what
+it shows must be what it would save. Filling it from `toString` silently turned
+a station typed as 8.555 into 8.5 the moment the box lost focus.
+
+-}
+toEditString : Km -> String
+toEditString (Km value) =
+    let
+        thousandths =
+            round (value * 1000)
+
+        fraction =
+            modBy 1000 thousandths
+    in
+    if fraction == 0 then
+        String.fromInt (thousandths // 1000)
+
+    else
+        String.fromInt (thousandths // 1000)
+            ++ "."
+            ++ withoutTrailingZeros (String.padLeft 3 '0' (String.fromInt fraction))
+
+
+{-| Never called with all zeros: the caller has already ruled that out, so this
+cannot eat the whole string.
+-}
+withoutTrailingZeros : String -> String
+withoutTrailingZeros text =
+    if String.endsWith "0" text then
+        withoutTrailingZeros (String.dropRight 1 text)
+
+    else
+        text

@@ -31,12 +31,29 @@ recompute what the module already knows.
 
 ## Rules with teeth
 
-- **Ports carry data, never decisions.** If a port handler in `public/index.html`
-  starts choosing or formatting, the change belongs in `Core` instead.
-- **English identifiers and comments; Vietnamese only inside string literals.**
-- **Every inbound `Value` is decoded.** No `Decode.value` reaching the model.
+- **Ports carry data, never decisions.** The TypeScript in `runtime/` reads a
+  sensor, parses XML, writes to storage or hands off to another app. It never
+  picks a milestone, never judges whether a runner is off course, never builds
+  a string a person reads. Elm's no-runtime-exception guarantee stops at the
+  port, so the port must not be where the thinking happens.
+- **The browser half of the boundary is typed.** `runtime/ports.ts` names the
+  shape of every message crossing a port, mirroring `src/Runtime/Ports.elm` and
+  the decoders beside it. `save` takes `unknown` on purpose: the snapshot
+  belongs to `Storage.Snapshot`, and a type for it here would invite this layer
+  to read it.
+- **Everything inbound is decoded.** A `Value` arriving from a port or from
+  storage becomes a `Result` before it goes near the model. No `Decode.value`
+  reaching the model.
+- **English for code, Vietnamese for people.** Identifiers, comments and doc
+  comments are English. Vietnamese appears only inside string literals that are
+  rendered to the user.
+- **Stylesheet over inline styles.** Elm names classes; `styles/app.css` owns
+  the look. Spacing between stacked controls lives there too.
 
-`python3 devops/check.py` enforces the first two mechanically.
+`python3 devops/check.py` enforces the port and language rules mechanically, in
+Elm and in TypeScript, alongside its structural checks: module names match
+paths, qualified names are imported, and exposed names exist. `elm-review`
+(config in `review/`, part of `npm run check`) keeps unused code out.
 
 ## Why devops/check.py exists
 

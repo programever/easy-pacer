@@ -22,6 +22,8 @@ anywhere, and needs no account. It is served at
   tap.
 - Type the cutoff table as the organiser publishes it. Stations without a
   cutoff are allowed; the countdown borrows the next one that has one.
+- Stations are ordered by hand with up and down buttons; seeding from the GPX
+  file sorts them by km once, and the start and finish stay pinned to the ends.
 - Plan review before the start: checkpoints past the end of the course,
   duplicates, cutoffs out of order, and legs that imply an impossible speed.
 - During the race: the next checkpoint, how far, how much up and down, and
@@ -58,48 +60,25 @@ Function follows Type, Type follows File, File follows Context**.
     Page        one module per screen
     View        reusable rendering
 
-A function that operates on a type lives in that type's file. Reaching for a new
-`Utils.elm` is nearly always the wrong move here.
+A function that operates on a type lives in that type's file.
 
 There is no `Core/Api` and no `Api/`: this app has no backend. The equivalent of
 T2 is `Storage` (localStorage and the shareable plan file) and the equivalent of
 T3 is `Runtime/Ports` (the contract with the browser).
 
-## Rules
+Coding conventions live in `CLAUDE.md`, and the checks in `devops/` enforce
+them mechanically.
 
-**Ports carry data, never decisions.** The TypeScript in `runtime/` reads a
-sensor, parses XML, writes to storage or hands off to another app. It never
-picks a milestone, never judges whether a runner is off course, never builds a
-string a person reads. Elm's no-runtime-exception guarantee stops at the port,
-so the port must not be where the thinking happens.
+## The build
 
-**The browser half of the boundary is typed.** `runtime/ports.ts` names the
-shape of every message crossing a port, mirroring `src/Runtime/Ports.elm` and
-the decoders beside it. `save` takes `unknown` on purpose: the snapshot belongs
-to `Storage.Snapshot`, and a type for it here would invite this layer to read
-it.
-
-**Everything inbound is decoded.** A `Value` arriving from a port or from
-storage becomes a `Result` before it goes near the model.
-
-**English for code, Vietnamese for people.** Identifiers, comments and doc
-comments are English. Vietnamese appears only inside string literals that are
-rendered to the user. `devops/check.py` enforces this, in Elm and in
-TypeScript, alongside its structural checks: module names match paths,
-qualified names are imported, and exposed names exist.
-
-**One file out.** `devops/build.sh` runs Vite, which compiles the Elm, compiles
-`runtime/`, minifies both and inlines them with the stylesheet into
-`dist/index.html`. The app is used on a mountain with no signal; a single file
-that opens and runs is a hard requirement, so the script then asserts that the
-output references nothing outside itself. One more file sits beside it:
-`dist/sw.js`, the service worker built from `runtime/sw.ts`, which keeps
-`index.html` on the phone so a refresh with no signal still opens it. It has
-to be a separate file because a browser fetches a service worker by URL; the
-app runs without it.
-
-**Stylesheet over inline styles.** Elm names classes; `styles/app.css` owns the
-look. Spacing between stacked controls lives there too.
+`devops/build.sh` runs Vite, which compiles the Elm, compiles `runtime/`,
+minifies both and inlines them with the stylesheet into `dist/index.html`. The
+app is used on a mountain with no signal; a single file that opens and runs is
+a hard requirement, so the script then asserts that the output references
+nothing outside itself. One more file sits beside it: `dist/sw.js`, the service
+worker built from `runtime/sw.ts`, which keeps `index.html` on the phone so a
+refresh with no signal still opens it. It has to be a separate file because a
+browser fetches a service worker by URL; the app runs without it.
 
 ## Illegal states this design removes
 
@@ -122,10 +101,11 @@ look. Spacing between stacked controls lives there too.
 ## Working here
 
     nvm install       # Node, from .nvmrc
-    npm install       # elm, elm-format, elm-test, vite, at the pinned versions
+    npm install       # elm, elm-format, elm-test, elm-review, vite, pinned
 
     npm run start     # localhost, with hot reload on Elm and TypeScript
-    npm run check     # type check      elm make … && tsc --noEmit
+    npm run check     # elm make … && tsc --noEmit && elm-review
+    npm run lint      # unused code     elm-review (config in review/)
     npm run format    # formatting      elm-format --validate src/ tests/
     npm test          # propositions    elm-test
     npm run structure # structural      python3 devops/check.py
@@ -155,6 +135,6 @@ is what lets the browser grant geolocation and register the service worker.
 ## Contributing
 
 Issues, feedback and pull requests are welcome at
-<https://github.com/programever/easy-pacer>. The rules above are the review
-checklist; `npm run check && npm run format && npm test && npm run structure`
-is what the deploy runs.
+<https://github.com/programever/easy-pacer>. The conventions in `CLAUDE.md` are
+the review checklist; `npm run check && npm run format && npm test &&
+npm run structure` is what the deploy runs.

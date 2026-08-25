@@ -86,8 +86,11 @@ Sub-number every item so review comments can name a point.
 
 ## iOS Safari lessons
 
-- Safari on iOS ignores `touch-action` on SVG elements. The wrapper div
-  (`.profile-card`, `.map-card`) carries `touch-action:none`, not just the SVG.
+- Safari on iOS ignores `touch-action` on SVG elements. A wrapper div
+  (`.profile-plot`, `.map-view`) carries `touch-action:none`, not just the SVG.
+  The wrapper must hold ONLY the SVG: `touch-action:none` on the whole card
+  also blocked page scrolling from the legend/footer text rows, because a
+  scroll is only allowed when every ancestor of the touched element permits it.
 - The checkpoint editor list is rendered with `Html.Keyed`, keyed by
   checkpoint id, so a card that moves takes its DOM node — and any focused
   input — with it. Unkeyed, values swap between cards under the runner's

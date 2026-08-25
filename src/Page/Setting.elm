@@ -608,13 +608,15 @@ courseSection state =
                 , fact (String.fromInt (Elevation.inWholeMeters (Route.totalDescent course))) "M xuống"
                 ]
             , div [ class "profile-card" ]
-                [ Profile.view
-                    (Pointer.scrub (\x w -> SettingChanged (ScrubSetup x w)))
-                    { route = course
-                    , checkpoints = state.draft.checkpoints
-                    , you = Nothing
-                    , cursor = cursorKm state
-                    }
+                [ div [ class "profile-plot" ]
+                    [ Profile.view
+                        (Pointer.scrub (\x w -> SettingChanged (ScrubSetup x w)))
+                        { route = course
+                        , checkpoints = state.draft.checkpoints
+                        , you = Nothing
+                        , cursor = cursorKm state
+                        }
+                    ]
                 , div [ class "profile-legend" ]
                     [ Html.span [] [ text (String.fromInt (round low) ++ "m") ]
                     , Html.span [] [ text "Mặt cắt độ cao" ]

@@ -716,25 +716,27 @@ locatePanel race =
     div []
         [ guide race
         , div [ class "map-card" ]
-            [ Map.view
-                (Pointer.wheel (RacingChanged << MapWheel)
-                    :: Pointer.drag
-                        { down = \id at -> RacingChanged (MapPointerDown id at)
-                        , move = \id at w -> RacingChanged (MapPointerMove id at w)
-                        , up = RacingChanged << MapPointerUp
-                        }
-                )
-                { route = Plan.route race.plan
-                , view = race.map
-                , checkpoints = NonEmpty.toList (Plan.checkpoints race.plan)
-                , reached = Progress.km race.progress
-                , fix = Progress.lastFix race.progress
-                , lost = currentState race == OffRoute
-                , uncertain = currentState race == Uncertain
-                , snapTo = snapTarget race
-                , cursor = cursorKm race
-                , breadcrumbs = List.map .at (Progress.breadcrumbs race.progress)
-                }
+            [ div [ class "map-view" ]
+                [ Map.view
+                    (Pointer.wheel (RacingChanged << MapWheel)
+                        :: Pointer.drag
+                            { down = \id at -> RacingChanged (MapPointerDown id at)
+                            , move = \id at w -> RacingChanged (MapPointerMove id at w)
+                            , up = RacingChanged << MapPointerUp
+                            }
+                    )
+                    { route = Plan.route race.plan
+                    , view = race.map
+                    , checkpoints = NonEmpty.toList (Plan.checkpoints race.plan)
+                    , reached = Progress.km race.progress
+                    , fix = Progress.lastFix race.progress
+                    , lost = currentState race == OffRoute
+                    , uncertain = currentState race == Uncertain
+                    , snapTo = snapTarget race
+                    , cursor = cursorKm race
+                    , breadcrumbs = List.map .at (Progress.breadcrumbs race.progress)
+                    }
+                ]
             , div [ class "map-foot" ]
                 [ div [ class "scale" ] [ text Map.gestureHint ]
                 , Form.miniButton "Về vị trí tôi" (RacingChanged ViewMe)
@@ -755,13 +757,15 @@ elevationCard race =
             Progress.km race.progress
     in
     div [ class "profile-card" ]
-        [ Profile.view
-            (Pointer.scrub (\x w -> RacingChanged (ScrubProfile x w)))
-            { route = Plan.route race.plan
-            , checkpoints = NonEmpty.toList (Plan.checkpoints race.plan)
-            , you = Just reached
-            , cursor = cursorKm race
-            }
+        [ div [ class "profile-plot" ]
+            [ Profile.view
+                (Pointer.scrub (\x w -> RacingChanged (ScrubProfile x w)))
+                { route = Plan.route race.plan
+                , checkpoints = NonEmpty.toList (Plan.checkpoints race.plan)
+                , you = Just reached
+                , cursor = cursorKm race
+                }
+            ]
         , div [ class "profile-legend" ]
             [ Html.span [] [ text "Xuất phát" ]
             , Html.span [] [ text ("Bạn ở km " ++ Km.toString reached) ]

@@ -125,11 +125,14 @@ label.lbl{display:block;font-size:12px;color:var(--muted);margin-bottom:5px;}
 .fact .k{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.09em;margin-top:3px;}
 
 /* ---------- elevation profile: the signature ---------- */
-/* touch-action on the wrapper, not only the SVG: iOS Safari ignores it on SVG elements. */
-.profile-card{background:var(--ink-2);border:1px solid var(--line);border-radius:14px;padding:12px 12px 8px;margin-top:14px;touch-action:none;}
-.profile-card svg{display:block;width:100%;height:96px;touch-action:none;cursor:crosshair;}
+/* touch-action on a div wrapper, not only the SVG: iOS Safari ignores it on SVG elements.
+   The wrapper holds ONLY the SVG — on the whole card it would also block page scrolling
+   from the legend and readout rows. */
+.profile-card{background:var(--ink-2);border:1px solid var(--line);border-radius:14px;padding:12px 12px 8px;margin-top:14px;}
+.profile-plot{touch-action:none;}
+.profile-plot svg{display:block;width:100%;height:96px;touch-action:none;cursor:crosshair;}
 /* Pointer positions are read relative to the SVG, so the SVG must be the target. */
-.profile-card svg *,.map-card svg *{pointer-events:none;}
+.profile-plot svg *,.map-view svg *{pointer-events:none;}
 .scrub-read{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.4;}
 .scrub-read.live{color:var(--warn);}
 .profile-legend{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:4px;}
@@ -202,9 +205,10 @@ label.lbl{display:block;font-size:12px;color:var(--muted);margin-bottom:5px;}
 .amt.ok{color:var(--ok);} .amt.warn{color:var(--warn);} .amt.late{color:var(--late);} .amt.flat{color:var(--muted);}
 
 /* ---------- locate screen ---------- */
-.map-card{margin:14px 16px 0;background:var(--ink-2);border:1px solid var(--line);border-radius:14px;overflow:hidden;touch-action:none;}
-.map-card svg{display:block;width:100%;height:300px;background:#0C131C;touch-action:none;cursor:grab;}
-.map-card svg:active{cursor:grabbing;}
+.map-card{margin:14px 16px 0;background:var(--ink-2);border:1px solid var(--line);border-radius:14px;overflow:hidden;}
+.map-view{touch-action:none;}
+.map-view svg{display:block;width:100%;height:300px;background:#0C131C;touch-action:none;cursor:grab;}
+.map-view svg:active{cursor:grabbing;}
 .map-foot{display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--line);align-items:center;}
 .map-foot .scale{font-family:var(--mono);font-size:10.5px;color:var(--muted);flex:1;line-height:1.35;}
 

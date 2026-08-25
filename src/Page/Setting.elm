@@ -35,6 +35,7 @@ import Json.Encode as Encode
 import Runtime.Ports as Ports
 import State exposing (Dialog(..), Field(..), Model, Screen(..), Scrub(..), SetupState)
 import Storage.PlanFile as PlanFile
+import Storage.Seeded as Seeded
 import Task
 import Time
 import View.Form as Form
@@ -67,6 +68,21 @@ update msg state model =
 
         SeedFromWaypoints ->
             ( withDraft (seedFromWaypoints draft) state model, Cmd.none )
+
+        SeedPlanChosen label ->
+            case List.filter (\plan -> plan.label == label) Seeded.plans of
+                [] ->
+                    ( model, Cmd.none )
+
+                plan :: _ ->
+                    case Decode.decodeString PlanFile.decoder plan.json of
+                        Ok loaded ->
+                            ( withDraft { loaded | checkpoints = pinEnds loaded.checkpoints } state model
+                            , Cmd.none
+                            )
+
+                        Err _ ->
+                            ( toast "Kế hoạch có sẵn bị lỗi — báo giúp bọn mình trên GitHub nhé." model, Cmd.none )
 
         AddStation ->
             let
@@ -575,7 +591,9 @@ courseSection : SetupState -> List (Html Msg)
 courseSection state =
     case state.draft.route of
         Nothing ->
-            [ Form.tallButton "Chọn file GPX" (SettingChanged PickGpxFile) ]
+            [ Form.tallButton "Chọn file GPX" (SettingChanged PickGpxFile)
+            , seededDropdown
+            ]
 
         Just course ->
             let
@@ -583,6 +601,7 @@ courseSection state =
                     Route.elevationRange course
             in
             [ Form.button "Chọn file GPX khác" (SettingChanged PickGpxFile)
+            , seededDropdown
             , div [ class "facts" ]
                 [ fact (Km.toString (Route.totalKm course)) "Km"
                 , fact (String.fromInt (Elevation.inWholeMeters (Route.totalAscent course))) "M leo"
@@ -623,6 +642,15 @@ courseSection state =
                     )
                     (SettingChanged SeedFromWaypoints)
             ]
+
+
+{-| The bundled race plans, offered right where a file would be chosen.
+-}
+seededDropdown : Html Msg
+seededDropdown =
+    Form.dropdown "Harvest Moon"
+        (List.map .label Seeded.plans)
+        (SettingChanged << SeedPlanChosen)
 
 
 cursorKm : SetupState -> Maybe Km.Km

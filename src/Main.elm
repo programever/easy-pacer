@@ -200,13 +200,9 @@ header model =
     Html.header [ class "bar" ]
         [ div [ class "bar-brand" ]
             [ div [ class "mark" ] [ text "TRẠM", Html.b [] [ text "KẾ" ] ]
-            , Html.a
-                [ class "bar-link"
-                , Html.Attributes.href About.repositoryUrl
-                , Html.Attributes.target "_blank"
-                , Html.Attributes.rel "noopener noreferrer"
-                ]
-                [ text "GitHub" ]
+            , Html.button
+                [ class "bar-link", Html.Events.onClick ShowAbout ]
+                [ text "Hướng dẫn" ]
             ]
         , div [ class "freshness" ] [ text (freshness model) ]
         ]

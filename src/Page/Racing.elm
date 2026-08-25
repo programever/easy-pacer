@@ -771,6 +771,7 @@ elevationCard race =
             , Html.span [] [ text ("Bạn ở km " ++ Km.toString reached) ]
             , Html.span [] [ text ("Về đích km " ++ Km.toString (Route.totalKm (Plan.route race.plan))) ]
             ]
+        , Profile.captions (NonEmpty.toList (Plan.checkpoints race.plan))
         , div [ class "scrub-read", classList [ ( "live", race.scrub /= NotScrubbing ) ] ]
             [ text (scrubReadout race) ]
         ]

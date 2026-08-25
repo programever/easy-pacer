@@ -1,4 +1,4 @@
-module View.Profile exposing (Config, kmAtFraction, readout, view)
+module View.Profile exposing (Config, captions, kmAtFraction, readout, view)
 
 {-| The elevation chart: the course seen side on, with checkpoint ticks, the
 runner's position, and an optional cursor.
@@ -15,7 +15,8 @@ import Core.App.Km as Km exposing (Km)
 import Core.App.Route as Route exposing (Route)
 import Core.Data.Distance as Distance
 import Core.Data.Elevation as Elevation
-import Html exposing (Attribute)
+import Html exposing (Attribute, Html)
+import Html.Attributes as HtmlAttr
 import Svg exposing (Svg)
 import Svg.Attributes as SvgAttr
 import View.Theme as Theme
@@ -153,29 +154,77 @@ view attributes config =
                     ]
                     []
               ]
-            , List.map (checkpointTick toX) (List.filter isTickable config.checkpoints)
+            , List.map (checkpointTick toX) (ticks config.checkpoints)
             , marker toX toY config.route "#EEF3F7" 4.5 config.you
             , marker toX toY config.route Theme.scrubColour 5 config.cursor
             ]
         )
 
 
-isTickable : Checkpoint -> Bool
-isTickable checkpoint =
-    checkpoint.role /= Checkpoint.StartLine
+{-| The caption row under the chart: a coloured dot, a name and a milestone for
+every tick. Reads the same list the chart draws from, so a caption cannot end
+up describing a colour the chart did not use.
+
+The km is not decoration. Five hues cover any number of stations by repeating,
+and on a course with a sixth station the km is the only thing that separates
+two captions wearing the same colour.
+
+-}
+captions : List Checkpoint -> Html msg
+captions checkpoints =
+    Html.div [ HtmlAttr.class "profile-cps" ]
+        (List.map caption (ticks checkpoints))
 
 
-checkpointTick : (Km -> Float) -> Checkpoint -> Svg msg
-checkpointTick toX checkpoint =
+caption : ( String, Checkpoint ) -> Html msg
+caption ( colour, checkpoint ) =
+    Html.span [ HtmlAttr.class "cap" ]
+        [ Svg.svg
+            [ SvgAttr.class "dot", SvgAttr.viewBox "0 0 8 8" ]
+            [ Svg.circle
+                [ SvgAttr.cx "4", SvgAttr.cy "4", SvgAttr.r "4", SvgAttr.fill colour ]
+                []
+            ]
+        , Html.text (checkpoint.name ++ " · km " ++ Km.toString checkpoint.km)
+        ]
+
+
+{-| Every checkpoint the chart marks, paired with its colour. The start is not
+among them: it is the left edge of the chart, and a tick on the axis marks
+nothing. Stations take the cycling hues in course order; the finish stands
+outside that cycle.
+-}
+ticks : List Checkpoint -> List ( String, Checkpoint )
+ticks checkpoints =
+    List.filter (\checkpoint -> checkpoint.role /= Checkpoint.StartLine) checkpoints
+        |> List.foldl
+            (\checkpoint ( taken, acc ) ->
+                case checkpoint.role of
+                    Checkpoint.Station ->
+                        ( taken + 1, ( Theme.stationColour taken, checkpoint ) :: acc )
+
+                    Checkpoint.FinishLine ->
+                        ( taken, ( Theme.finishColour, checkpoint ) :: acc )
+
+                    Checkpoint.StartLine ->
+                        ( taken, acc )
+            )
+            ( 0, [] )
+        |> Tuple.second
+        |> List.reverse
+
+
+checkpointTick : (Km -> Float) -> ( String, Checkpoint ) -> Svg msg
+checkpointTick toX ( colour, checkpoint ) =
     Svg.line
         [ SvgAttr.x1 (round1 (toX checkpoint.km))
         , SvgAttr.y1 "0"
         , SvgAttr.x2 (round1 (toX checkpoint.km))
         , SvgAttr.y2 (String.fromFloat height)
-        , SvgAttr.stroke Theme.checkpointColour
+        , SvgAttr.stroke colour
         , SvgAttr.strokeWidth "1"
         , SvgAttr.strokeDasharray "3 3"
-        , SvgAttr.opacity ".45"
+        , SvgAttr.opacity ".6"
         ]
         []
 

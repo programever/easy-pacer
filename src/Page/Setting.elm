@@ -622,6 +622,7 @@ courseSection state =
                     , Html.span [] [ text "Mặt cắt độ cao" ]
                     , Html.span [] [ text (String.fromInt (round high) ++ "m") ]
                     ]
+                , Profile.captions state.draft.checkpoints
                 , div [ class "scrub-read", classList [ ( "live", state.scrub /= NotScrubbing ) ] ]
                     [ text
                         (case state.scrub of

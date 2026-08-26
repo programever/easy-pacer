@@ -729,7 +729,7 @@ locatePanel race =
                     , view = race.map
                     , checkpoints = NonEmpty.toList (Plan.checkpoints race.plan)
                     , reached = Progress.km race.progress
-                    , fix = Progress.lastFix race.progress
+                    , you = you race
                     , lost = currentState race == OffRoute
                     , uncertain = currentState race == Uncertain
                     , snapTo = snapTarget race
@@ -775,6 +775,20 @@ elevationCard race =
         , div [ class "scrub-read", classList [ ( "live", race.scrub /= NotScrubbing ) ] ]
             [ text (scrubReadout race) ]
         ]
+
+
+{-| Where the map draws the runner. A km the runner typed is their position
+now, so the dot follows it; the last fix is only theirs while it is still what
+the progress was built from.
+-}
+you : RaceState -> Map.You
+you race =
+    case Progress.source race.progress of
+        FromGps fix ->
+            Map.Measured fix
+
+        FromRunner ->
+            Map.Declared
 
 
 {-| The nearest point of the course to the last GPS fix: where the dashed

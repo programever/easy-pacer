@@ -1,4 +1,4 @@
-module View.Map exposing (Config, gestureHint, unitsPerPixel, view)
+module View.Map exposing (Config, You(..), gestureHint, unitsPerPixel, view)
 
 {-| The course drawn straight from the GPX, with no map tiles and no library.
 
@@ -27,13 +27,24 @@ type alias Config =
     , view : MapView
     , checkpoints : List Checkpoint
     , reached : Km
-    , fix : Maybe Fix
+    , you : You
     , lost : Bool
     , uncertain : Bool
     , snapTo : Maybe LatLon
     , cursor : Maybe Km
     , breadcrumbs : List LatLon
     }
+
+
+{-| Where the runner is, and on what authority. A GPS fix knows a latitude and
+an accuracy; a distance the runner typed knows neither, so it is drawn on the
+course at the km they claimed. `Maybe Fix` said only "no dot yet", which left a
+runner without GPS with no dot at all, and a runner who typed a km after a fix
+with a dot still sitting at the old fix.
+-}
+type You
+    = Measured Fix
+    | Declared
 
 
 width : Float
@@ -174,8 +185,8 @@ actually left the course, never on an uncertain reading.
 -}
 backToRoute : Config -> (LatLon -> { x : Float, y : Float }) -> List (Svg msg)
 backToRoute config project =
-    case ( config.lost, config.fix, config.snapTo ) of
-        ( True, Just fix, Just target ) ->
+    case ( config.lost, config.you, config.snapTo ) of
+        ( True, Measured fix, Just target ) ->
             let
                 from =
                     project fix.at
@@ -199,16 +210,17 @@ backToRoute config project =
             []
 
 
-{-| The runner, ringed by the accuracy the fix reported. Showing the ring is the
-honest way to say how much the dot can be trusted.
+{-| The runner. A measured position is ringed by the accuracy the fix reported,
+which is the honest way to say how much the dot can be trusted; a declared one
+claims no accuracy and so wears no ring.
 -}
 youAreHere : Config -> (LatLon -> { x : Float, y : Float }) -> List (Svg msg)
 youAreHere config project =
-    case config.fix of
-        Nothing ->
-            []
+    case config.you of
+        Declared ->
+            [ dot (project (Route.atKm config.route config.reached).position) Theme.youColour ]
 
-        Just fix ->
+        Measured fix ->
             let
                 screen =
                     project fix.at
@@ -236,16 +248,21 @@ youAreHere config project =
                 , SvgAttr.strokeOpacity ".35"
                 ]
                 []
-            , Svg.circle
-                [ SvgAttr.cx (round1 screen.x)
-                , SvgAttr.cy (round1 screen.y)
-                , SvgAttr.r "5"
-                , SvgAttr.fill colour
-                , SvgAttr.stroke "#101823"
-                , SvgAttr.strokeWidth "1.5"
-                ]
-                []
+            , dot screen colour
             ]
+
+
+dot : { x : Float, y : Float } -> String -> Svg msg
+dot screen colour =
+    Svg.circle
+        [ SvgAttr.cx (round1 screen.x)
+        , SvgAttr.cy (round1 screen.y)
+        , SvgAttr.r "5"
+        , SvgAttr.fill colour
+        , SvgAttr.stroke "#101823"
+        , SvgAttr.strokeWidth "1.5"
+        ]
+        []
 
 
 {-| Mirrors the elevation cursor, so dragging the chart shows where that point

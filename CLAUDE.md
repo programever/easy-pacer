@@ -91,6 +91,10 @@ Sub-number every item so review comments can name a point.
   The wrapper must hold ONLY the SVG: `touch-action:none` on the whole card
   also blocked page scrolling from the legend/footer text rows, because a
   scroll is only allowed when every ancestor of the touched element permits it.
+- Installed to the home screen the app runs full screen with
+  `viewport-fit=cover`, so the notch and the home bar sit over the page. Every
+  edge that holds content pays the `env(safe-area-inset-*)` tax: the sticky
+  header's `padding-top`, `.wrap`'s bottom and sides, the sheet and the toast.
 - The checkpoint editor list is rendered with `Html.Keyed`, keyed by
   checkpoint id, so a card that moves takes its DOM node — and any focused
   input — with it. Unkeyed, values swap between cards under the runner's

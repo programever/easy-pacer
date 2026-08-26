@@ -20,6 +20,7 @@ module State exposing
     , pointerMove
     , pointerUp
     , setup
+    , tick
     , zoomBy
     )
 
@@ -37,6 +38,7 @@ import Core.App.Plan as Plan exposing (Draft, Issue, Plan)
 import Core.App.Position exposing (Candidate)
 import Core.App.Progress exposing (Progress)
 import Core.App.Route as Route exposing (Route)
+import Core.Data.Duration as Duration exposing (Duration)
 import Core.Data.NonEmpty as NonEmpty exposing (NonEmpty)
 import Dict exposing (Dict)
 import Time
@@ -188,6 +190,28 @@ initialModel zone now =
 setup : Draft -> SetupState
 setup draft =
     { draft = draft, typing = Nothing, scrub = NotScrubbing }
+
+
+{-| The clock moved. A toast leaves with it once it has had its time on screen:
+nothing else in the program dismisses one, so the tick is what retires it.
+-}
+tick : Time.Posix -> Model -> Model
+tick now model =
+    { model | now = now, toast = Maybe.andThen (unexpired now) model.toast }
+
+
+toastLife : Duration
+toastLife =
+    Duration.fromSeconds 30
+
+
+unexpired : Time.Posix -> Toast -> Maybe Toast
+unexpired now toast =
+    if Duration.inMinutes (Duration.between toast.shownAt now) >= Duration.inMinutes toastLife then
+        Nothing
+
+    else
+        Just toast
 
 
 noGesture : MapGesture

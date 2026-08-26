@@ -2,6 +2,7 @@ module Core.Data.Duration exposing
     ( Duration
     , between
     , fromMinutes
+    , fromSeconds
     , inHours
     , inMinutes
     , isNegative
@@ -23,6 +24,11 @@ type Duration
 fromMinutes : Float -> Duration
 fromMinutes m =
     Duration m
+
+
+fromSeconds : Float -> Duration
+fromSeconds s =
+    Duration (s / 60)
 
 
 between : Time.Posix -> Time.Posix -> Duration

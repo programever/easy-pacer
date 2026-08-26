@@ -141,8 +141,44 @@ suite =
                 \_ -> Expect.equal (PlanFile.nameFromFile "route") "route"
             ]
         , gestureSuite
+        , toastSuite
         , targetSuite
         , overnightSuite
+        ]
+
+
+{-| A toast is set by whatever raised it and never dismissed by hand, so the
+proposition is that the clock alone takes it away, and not before its time.
+-}
+toastSuite : Test
+toastSuite =
+    let
+        shown =
+            let
+                blank =
+                    State.initialModel Time.utc (Time.millisToPosix 0)
+            in
+            { blank | toast = Just { text = "toast", shownAt = Time.millisToPosix 0 } }
+    in
+    describe "A toast leaves on its own after thirty seconds"
+        [ test "a second short of its time it is still on screen" <|
+            \_ ->
+                State.tick (Time.millisToPosix 29000) shown
+                    |> .toast
+                    |> Expect.notEqual Nothing
+        , test "at thirty seconds the tick clears it" <|
+            \_ ->
+                State.tick (Time.millisToPosix 30000) shown
+                    |> .toast
+                    |> Expect.equal Nothing
+        , test "a tick with no toast showing leaves the model alone" <|
+            \_ ->
+                let
+                    quiet =
+                        State.initialModel Time.utc (Time.millisToPosix 0)
+                in
+                State.tick (Time.millisToPosix 90000) quiet
+                    |> Expect.equal { quiet | now = Time.millisToPosix 90000 }
         ]
 
 

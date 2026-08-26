@@ -96,7 +96,7 @@ step msg model =
             ( { model | zone = zone }, Cmd.none )
 
         Tick now ->
-            ( { model | now = now }, Cmd.none )
+            ( State.tick now model, Cmd.none )
 
         SettingChanged inner ->
             case model.screen of
@@ -167,12 +167,16 @@ notify content model =
     { model | toast = Just { text = content, shownAt = model.now } }
 
 
+{-| The clock ticks every second. The freshness line only needs minutes, but a
+toast is stamped with `model.now` and has to retire thirty seconds later, so a
+coarse tick would cut its time on screen short.
+-}
 subscriptions : Model -> Sub Msg
 subscriptions _ =
     Sub.batch
         [ Ports.gpsIn GpsArrived
         , Ports.gpxIn GpxArrived
-        , Time.every 20000 Tick
+        , Time.every 1000 Tick
         ]
 
 

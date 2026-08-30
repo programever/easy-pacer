@@ -28,8 +28,6 @@ type SettingMsg
     | GpxFileSelected File
     | GpxTextRead String
     | SeedFromWaypoints
-      -- One of the bundled race plans, picked from the dropdown by its label.
-    | SeedPlanChosen String
     | AddStation
     | RemoveStation Checkpoint.Id
     | MoveStationUp Checkpoint.Id

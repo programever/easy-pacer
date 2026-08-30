@@ -1,7 +1,6 @@
 module View.Form exposing
     ( button
     , clockField
-    , dropdown
     , field
     , iconButton
     , miniButton
@@ -29,22 +28,9 @@ where that second event comes from.
 
 -}
 
-import Html exposing (Attribute, Html, div, input, label, option, select, text)
+import Html exposing (Attribute, Html, div, input, label, text)
 import Html.Attributes as Attr exposing (class, placeholder, type_, value)
 import Html.Events exposing (onBlur, onClick, onInput)
-
-
-{-| A native dropdown styled like a button. The first entry is the label,
-shown until something is chosen and unselectable after that.
--}
-dropdown : String -> List String -> (String -> msg) -> Html msg
-dropdown labelText options toMsg =
-    select [ class "drop-select", onInput toMsg ]
-        (option
-            [ value "", Attr.selected True, Attr.disabled True, Attr.hidden True ]
-            [ text labelText ]
-            :: List.map (\entry -> option [ value entry ] [ text entry ]) options
-        )
 
 
 button : String -> msg -> Html msg

@@ -75,12 +75,6 @@ button{font-family:inherit;}
    button; Elm only names classes, so the spacing lives here instead. */
 .step>.btn+.btn,.step>.btn+.pair,.step>div+.btn,.step>div+.pair,.sos>.sos-preview+.btn{margin-top:10px;}
 .step>.btn+.field{margin-top:14px;}
-.drop-select{
-  display:block;width:100%;margin-top:10px;min-height:46px;padding:0 12px;
-  background:var(--ink-2);color:var(--text);border:1px solid var(--line);border-radius:11px;
-  font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:.04em;
-  -webkit-appearance:none;appearance:none;cursor:pointer;
-}
 /* A step waiting on the course: dimmed, and inert (set in the view) blocks input. */
 .step.off{opacity:.45;pointer-events:none;}
 /* The same inside a sheet: choices stack, and a quiet button spans the

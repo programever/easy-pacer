@@ -309,21 +309,6 @@ applyTyped model field raw draft =
             , blank || parsed /= Nothing
             )
 
-        ClimbField ->
-            case ( blank, String.toInt raw ) of
-                ( True, _ ) ->
-                    ( { draft | climbRatio = 1000 }, True )
-
-                ( False, Just value ) ->
-                    if value > 0 then
-                        ( { draft | climbRatio = value }, True )
-
-                    else
-                        ( draft, False )
-
-                ( False, Nothing ) ->
-                    ( draft, False )
-
 
 renameIf : Checkpoint.Id -> String -> Checkpoint -> Checkpoint
 renameIf id name checkpoint =
@@ -381,9 +366,6 @@ rejectedText field =
 
         TargetOf _ ->
             "Giờ chưa đúng — nhập kiểu 05:30."
-
-        ClimbField ->
-            "Số mét chưa đúng — nhập số nguyên dương, ví dụ 1000."
 
 
 {-| Start first, then the stations in the order given, then the finish. The
@@ -698,13 +680,6 @@ checkpointSection state =
             state.draft.checkpoints
         )
     , Form.miniButton "Thêm một trạm" (SettingChanged AddStation)
-    , Form.field "Quy đổi dốc: 100 m leo bằng bao nhiêu mét đường bằng?"
-        (Form.typedNumberField "1000"
-            (shown state ClimbField (String.fromInt state.draft.climbRatio))
-            (typedInto ClimbField)
-            done
-        )
-    , Theme.note "App dùng số này để tính màu cho trạng thái COT khi chạy."
     ]
 
 

@@ -1,7 +1,6 @@
 module Core.Data.Duration exposing
     ( Duration
     , between
-    , fromMinutes
     , fromSeconds
     , inHours
     , inMinutes
@@ -19,11 +18,6 @@ import Time
 
 type Duration
     = Duration Float
-
-
-fromMinutes : Float -> Duration
-fromMinutes m =
-    Duration m
 
 
 fromSeconds : Float -> Duration

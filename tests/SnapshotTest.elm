@@ -134,7 +134,6 @@ racing =
             , time = Clock.fromString "06:00"
             , nextId = 4
             , name = ""
-            , climbRatio = 1000
             }
 
         fix =

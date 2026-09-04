@@ -15,7 +15,7 @@ import Core.App.Plan as Plan
 import Core.App.Position as Position exposing (Candidate, Resolution(..), RouteState(..))
 import Core.App.Progress as Progress exposing (Fix, Source(..))
 import Core.App.Route as Route
-import Core.App.Segment as Segment exposing (Segment, Urgency(..))
+import Core.App.Segment as Segment exposing (Segment)
 import Core.App.Sos as Sos
 import Core.Data.Clock as Clock
 import Core.Data.Distance as Distance
@@ -487,7 +487,7 @@ nextCard model race reached =
                         ""
                     ]
                 , targetLine checkpoint
-                , cutoffVerdict model race reached borrowed segment shownCutoff
+                , cutoffVerdict model borrowed shownCutoff
                 ]
 
 
@@ -515,32 +515,15 @@ cutoffLabel borrowed =
             "Tới COT · " ++ Checkpoint.displayName checkpoint
 
 
-{-| The colour and the sentence under the countdown. The judgement is made on
-the segment to the checkpoint that OWNS the binding cutoff — when the next
-stop is a water station, being green to the station means nothing if the real
-deadline further on demands a sprint.
+{-| The sentence under the countdown: which cutoff binds and when it falls.
+A fact off the race sheet, not a judgement of the runner's pace; it only turns
+red once the cutoff is already behind.
 -}
-cutoffVerdict : Model -> RaceState -> Km -> Maybe ( Checkpoint, Segment.CutoffMoment ) -> Segment -> Maybe Segment.CutoffMoment -> Html Msg
-cutoffVerdict model race reached borrowed segment shownCutoff =
-    let
-        ratio =
-            Plan.climbRatio race.plan
-
-        binding =
-            case borrowed of
-                Just ( checkpoint, _ ) ->
-                    Segment.toCheckpoint model.zone race.plan reached model.now checkpoint
-
-                Nothing ->
-                    segment
-
-        pace =
-            Segment.requiredPace ratio binding
-                |> Maybe.map (\value -> "cần nhanh hơn " ++ paceText value ++ " phút/km (đã quy đổi dốc)")
-    in
+cutoffVerdict : Model -> Maybe ( Checkpoint, Segment.CutoffMoment ) -> Maybe Segment.CutoffMoment -> Html Msg
+cutoffVerdict model borrowed shownCutoff =
     case ( borrowed, shownCutoff ) of
         ( Just ( checkpoint, moment ), _ ) ->
-            Theme.verdict (Segment.urgency ratio binding)
+            Theme.verdict (toneOf moment)
                 "Trạm này không có giờ đóng trạm"
                 (Just
                     ("Mốc gần nhất là "
@@ -549,29 +532,27 @@ cutoffVerdict model race reached borrowed segment shownCutoff =
                         ++ Km.toString checkpoint.km
                         ++ ", đóng lúc "
                         ++ clockOf model moment.closesAt
-                        ++ (Maybe.map (\line -> " — " ++ line) pace |> Maybe.withDefault "")
                     )
                 )
 
         ( Nothing, Just moment ) ->
             if Duration.isNegative moment.remaining then
-                Theme.verdict Missed ("Đã quá giờ đóng trạm " ++ clockOf model moment.closesAt) Nothing
+                Theme.verdict Theme.Overdue ("Đã quá giờ đóng trạm " ++ clockOf model moment.closesAt) Nothing
 
             else
-                Theme.verdict (Segment.urgency ratio binding)
-                    ("Đóng trạm lúc " ++ clockOf model moment.closesAt)
-                    pace
+                Theme.verdict Theme.Neutral ("Đóng trạm lúc " ++ clockOf model moment.closesAt) Nothing
 
         _ ->
-            Theme.verdict NoDeadline "Phía trước không còn trạm nào có giờ đóng trạm" Nothing
+            Theme.verdict Theme.Neutral "Phía trước không còn trạm nào có giờ đóng trạm" Nothing
 
 
-{-| One decimal, with the Vietnamese decimal comma.
--}
-paceText : Float -> String
-paceText pace =
-    String.fromFloat (Basics.toFloat (round (pace * 10)) / 10)
-        |> String.replace "." ","
+toneOf : Segment.CutoffMoment -> Theme.Tone
+toneOf moment =
+    if Duration.isNegative moment.remaining then
+        Theme.Overdue
+
+    else
+        Theme.Neutral
 
 
 clockOf : Model -> Time.Posix -> String
@@ -651,7 +632,7 @@ ledgerRow model race reached checkpoint =
             [ div [ class "nm" ] [ text (Checkpoint.displayName checkpoint) ]
             , div [ class "sub" ] [ text detail ]
             ]
-        , amountCell model (Plan.climbRatio race.plan) checkpoint segment
+        , amountCell model checkpoint segment
         ]
 
 
@@ -673,19 +654,20 @@ targetMargin model race checkpoint arrived =
 
 
 {-| The right hand column. Ahead of the runner it is a countdown to the
-cutoff; behind, it is the margin they actually had when they arrived, which is
-a fixed fact and must not keep drifting with the clock. Both name the cutoff
-time itself, because "2h10 to go" means nothing without "until 12:30".
+cutoff, red only once the cutoff is behind; after arrival it is the margin
+they actually had, which is a fixed fact and must not keep drifting with the
+clock. Both name the cutoff time itself, because "2h10 to go" means nothing
+without "until 12:30".
 -}
-amountCell : Model -> Int -> Checkpoint -> Segment -> Html Msg
-amountCell model ratio checkpoint segment =
+amountCell : Model -> Checkpoint -> Segment -> Html Msg
+amountCell model checkpoint segment =
     case ( segment.cutoff, Checkpoint.passedAt checkpoint ) of
         ( Nothing, _ ) ->
             div [ class "amt flat" ]
                 [ text "—", Html.small [] [ text "không có COT" ] ]
 
         ( Just moment, Nothing ) ->
-            div [ class ("amt " ++ Theme.urgencyClass (Segment.urgency ratio segment)) ]
+            div [ class "amt", classList [ ( "late", Duration.isNegative moment.remaining ) ] ]
                 [ text (Duration.toCompactString moment.remaining)
                 , Html.small [] [ text ("COT " ++ clockOf model moment.closesAt) ]
                 ]

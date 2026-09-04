@@ -3,7 +3,6 @@ module Core.App.Plan exposing
     , Issue
     , Plan
     , checkpoints
-    , climbRatio
     , cutoffMoment
     , date
     , draftWithRoute
@@ -49,17 +48,11 @@ type Plan
         , date : DateOnly
         , time : Clock
         , name : String
-        , climbRatio : Int
         }
 
 
 {-| `name` is the name of the file the plan came from, without its extension,
 and is what the plan is saved as. Empty until a file has been loaded.
-
-`climbRatio` is the exchange rate between climbing and flat running: how many
-metres of flat road 100 m of ascent costs. It feeds the required-pace colour
-and nothing else; the runner tunes it to the terrain.
-
 -}
 type alias Draft =
     { route : Maybe Route
@@ -68,13 +61,7 @@ type alias Draft =
     , time : Maybe Clock
     , nextId : Int
     , name : String
-    , climbRatio : Int
     }
-
-
-defaultClimbRatio : Int
-defaultClimbRatio =
-    1000
 
 
 {-| A blocking issue is an arithmetic contradiction. An advisory is a figure
@@ -95,7 +82,6 @@ emptyDraft =
     , time = Nothing
     , nextId = 0
     , name = ""
-    , climbRatio = defaultClimbRatio
     }
 
 
@@ -193,7 +179,6 @@ fromDraft draft =
                             , date = currentDate
                             , time = currentTime
                             , name = draft.name
-                            , climbRatio = draft.climbRatio
                             }
                         )
 
@@ -232,13 +217,7 @@ toDraft (Plan plan) nextId =
     , time = Just plan.time
     , nextId = nextId
     , name = plan.name
-    , climbRatio = plan.climbRatio
     }
-
-
-climbRatio : Plan -> Int
-climbRatio (Plan plan) =
-    plan.climbRatio
 
 
 route : Plan -> Route

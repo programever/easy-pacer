@@ -78,7 +78,6 @@ type Field
     | KmOf Checkpoint.Id
     | CutoffOf Checkpoint.Id
     | TargetOf Checkpoint.Id
-    | ClimbField
 
 
 {-| The raw text in the box that has focus, kept separate from the parsed

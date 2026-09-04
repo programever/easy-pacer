@@ -11,12 +11,9 @@ import Core.App.LatLon exposing (LatLon)
 import Core.App.Plan as Plan
 import Core.App.Position as Position exposing (RouteState(..))
 import Core.App.Route as Route
-import Core.App.Segment as Segment
 import Core.Data.Clock as Clock
 import Core.Data.DateOnly as DateOnly
 import Core.Data.Distance as Distance
-import Core.Data.Duration as Duration
-import Core.Data.Elevation as Elevation
 import Expect
 import State
 import Storage.PlanFile as PlanFile
@@ -105,25 +102,6 @@ suite =
             , test "just past thirty metres with a precise fix means off course" <|
                 \_ -> Expect.equal (stateFor 40 8) OffRoute
             ]
-        , describe "The cutoff colour is the pace the budget demands"
-            -- 5 km with 300 m of climb is 8 flat-equivalent km at 100 m = 1000 m.
-            [ test "over 15 minutes per km to spare is green" <|
-                \_ -> Expect.equal (paceUrgency 130 5 300) Segment.Comfortable
-            , test "exactly 15 is already yellow" <|
-                \_ -> Expect.equal (paceUrgency 120 5 300) Segment.Tight
-            , test "exactly 10 is still yellow" <|
-                \_ -> Expect.equal (paceUrgency 80 5 300) Segment.Tight
-            , test "under 10 minutes per km is red" <|
-                \_ -> Expect.equal (paceUrgency 79 5 300) Segment.Critical
-            , test "a cutoff already behind is missed" <|
-                \_ -> Expect.equal (paceUrgency -5 5 300) Segment.Missed
-            , test "the climb ratio changes the verdict" <|
-                -- Same leg at 100 m = 2000 m: 11 flat km, 120 minutes is under 11 min/km.
-                \_ ->
-                    Expect.equal
-                        (Segment.urgency 2000 (segmentFor 120 5 300))
-                        Segment.Tight
-            ]
         , describe "Only a precise fix may move the milestone"
             [ test "eight metres of noise, on the course" <|
                 \_ -> Expect.equal (trustFor 15 8) True
@@ -211,7 +189,6 @@ targetSuite =
                         , time = Clock.fromString "05:30"
                         , nextId = 4
                         , name = ""
-                        , climbRatio = 1000
                         }
 
                 targetIssues result =
@@ -241,7 +218,6 @@ targetSuite =
                         , time = Clock.fromString "05:30"
                         , nextId = 3
                         , name = ""
-                        , climbRatio = 1000
                         }
             in
             describe "Targets must advance with the course"
@@ -277,7 +253,6 @@ targetSuite =
                                 , time = Clock.fromString "05:30"
                                 , nextId = 3
                                 , name = ""
-                                , climbRatio = 1000
                                 }
                             )
                             |> List.length
@@ -328,7 +303,6 @@ overnightSuite =
                         , time = Clock.fromString startText
                         , nextId = 9
                         , name = ""
-                        , climbRatio = 1000
                         }
 
                 orderIssues result =
@@ -385,7 +359,6 @@ overnightSuite =
                                 , time = Clock.fromString "02:00"
                                 , nextId = 9
                                 , name = ""
-                                , climbRatio = 1000
                                 }
                          of
                             Err _ ->
@@ -415,24 +388,6 @@ overnightSuite =
                         )
                             |> Expect.equal []
                 ]
-
-
-paceUrgency : Float -> Float -> Float -> Segment.Urgency
-paceUrgency minutesLeft km ascentMetres =
-    Segment.urgency 1000 (segmentFor minutesLeft km ascentMetres)
-
-
-segmentFor : Float -> Float -> Float -> Segment.Segment
-segmentFor minutesLeft km ascentMetres =
-    { distance = Distance.fromKilometers km
-    , ascent = Elevation.fromMeters ascentMetres
-    , descent = Elevation.fromMeters 0
-    , cutoff =
-        Just
-            { closesAt = Time.millisToPosix 0
-            , remaining = Duration.fromMinutes minutesLeft
-            }
-    }
 
 
 trustFor : Float -> Float -> Bool

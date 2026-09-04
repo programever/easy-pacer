@@ -72,7 +72,6 @@ encode draft =
           , Maybe.map (Clock.toString >> Encode.string) draft.time
                 |> Maybe.withDefault Encode.null
           )
-        , ( "climbRatio", Encode.int draft.climbRatio )
         ]
 
 
@@ -154,14 +153,13 @@ roleToString role =
 
 decoder : Decoder Draft
 decoder =
-    Decode.map6
-        (\course checkpoints maybeDate maybeTime name climbRatio ->
+    Decode.map5
+        (\course checkpoints maybeDate maybeTime name ->
             { route = course
             , checkpoints = checkpoints
             , date = maybeDate
             , time = maybeTime
             , name = name
-            , climbRatio = climbRatio
             , nextId =
                 1 + (List.maximum (List.map (.id >> Checkpoint.idToInt) checkpoints) |> Maybe.withDefault -1)
             }
@@ -175,7 +173,6 @@ decoder =
             |> Decode.map (Maybe.andThen Clock.fromString)
         )
         (Decode.oneOf [ Decode.field "name" Decode.string, Decode.succeed "" ])
-        (Decode.oneOf [ Decode.field "climbRatio" positiveInt, Decode.succeed 1000 ])
 
 
 isoDate : String -> Maybe DateOnly.DateOnly
@@ -259,21 +256,6 @@ checkpointDecoder =
         (Decode.oneOf [ Decode.field "role" Decode.string, Decode.succeed "station" ]
             |> Decode.map roleFromString
         )
-
-
-{-| A hand edited ratio of zero or less would divide the pace by nothing.
--}
-positiveInt : Decoder Int
-positiveInt =
-    Decode.int
-        |> Decode.map
-            (\value ->
-                if value > 0 then
-                    value
-
-                else
-                    1000
-            )
 
 
 roleFromString : String -> Checkpoint.Role

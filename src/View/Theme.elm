@@ -1,5 +1,6 @@
 module View.Theme exposing
-    ( card
+    ( Tone(..)
+    , card
     , checkpointColour
     , eyebrow
     , finishColour
@@ -14,7 +15,6 @@ module View.Theme exposing
     , sectionTitle
     , stationColour
     , uncertainColour
-    , urgencyClass
     , verdict
     , youColour
     )
@@ -35,7 +35,6 @@ and it stays clear of every colour above for that reason.
 -}
 
 import Core.App.Position exposing (RouteState(..))
-import Core.App.Segment exposing (Urgency(..))
 import Html exposing (Attribute, Html, div, p, span, text)
 import Html.Attributes exposing (class)
 
@@ -159,9 +158,18 @@ ledgerRow attributes children =
     div (class "lrow" :: attributes) children
 
 
-verdict : Urgency -> String -> Maybe String -> Html msg
-verdict level headline detail =
-    div [ class ("verdict " ++ urgencyClass level) ]
+{-| How the line under the countdown is coloured. A cutoff already behind is
+a fact worth red; everything else is stated plainly, because the app does not
+judge how fast the runner is going.
+-}
+type Tone
+    = Neutral
+    | Overdue
+
+
+verdict : Tone -> String -> Maybe String -> Html msg
+verdict tone headline detail =
+    div [ class ("verdict " ++ toneClass tone) ]
         (text headline
             :: (case detail of
                     Nothing ->
@@ -173,22 +181,13 @@ verdict level headline detail =
         )
 
 
-urgencyClass : Urgency -> String
-urgencyClass level =
-    case level of
-        NoDeadline ->
+toneClass : Tone -> String
+toneClass tone =
+    case tone of
+        Neutral ->
             "none"
 
-        Comfortable ->
-            "ok"
-
-        Tight ->
-            "warn"
-
-        Critical ->
-            "late"
-
-        Missed ->
+        Overdue ->
             "late"
 
 

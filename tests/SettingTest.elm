@@ -134,7 +134,6 @@ start =
                     , time = Nothing
                     , nextId = 4
                     , name = ""
-                    , climbRatio = 1000
                     }
                 )
     }

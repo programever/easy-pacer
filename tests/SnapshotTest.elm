@@ -167,6 +167,7 @@ racing =
                             , scrub = State.NotScrubbing
                             , kmEntryOpen = False
                             , kmEntryText = ""
+                            , aheadText = State.defaultAheadText
                             , gpsPending = False
                             }
                 }

@@ -407,12 +407,13 @@ startRace draft model =
                         { plan = plan
                         , startedAt = began
                         , progress = Progress.atStart began
-                        , tab = State.PlanTab
+                        , tab = State.LocateTab
                         , map = State.fitAll (Plan.route plan)
                         , gesture = State.noGesture
                         , scrub = NotScrubbing
                         , kmEntryOpen = False
                         , kmEntryText = ""
+                        , aheadText = State.defaultAheadText
                         , gpsPending = False
                         }
                 , dialog = Nothing

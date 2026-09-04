@@ -100,12 +100,13 @@ restore snapshot model =
                                 { plan = Plan.withCheckpoints (NonEmpty.map (markPassed race.passed) (Plan.checkpoints plan)) plan
                                 , startedAt = race.startedAt
                                 , progress = Progress.fromStored race.progress
-                                , tab = State.PlanTab
+                                , tab = State.LocateTab
                                 , map = State.fitAll (Plan.route plan)
                                 , gesture = State.noGesture
                                 , scrub = State.NotScrubbing
                                 , kmEntryOpen = False
                                 , kmEntryText = ""
+                                , aheadText = State.defaultAheadText
                                 , gpsPending = False
                                 }
                     }

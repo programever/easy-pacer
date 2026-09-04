@@ -14,6 +14,7 @@ module Core.App.Route exposing
     , projection
     , remainingAscent
     , remainingDescent
+    , slice
     , totalAscent
     , totalDescent
     , totalKm
@@ -364,6 +365,32 @@ interpolate before after target =
         , y = blend before.plane.y after.plane.y
         }
     }
+
+
+{-| The stretch of course between two milestones: the exact point at `from`,
+every recorded point strictly between, and the exact point at `to`. Both ends
+are clamped to the course. A `to` at or before `from` yields just the point at
+`from`, so a caller drawing the stretch draws nothing there rather than a line
+running backwards.
+-}
+slice : Route -> Km -> Km -> List Point
+slice route from to =
+    let
+        start =
+            atKm route from
+
+        end =
+            atKm route to
+    in
+    if Km.isAtOrBefore start.km end.km then
+        [ start ]
+
+    else
+        start
+            :: List.filter
+                (\point -> Km.isBefore point.km start.km && Km.isBefore end.km point.km)
+                (NonEmpty.toList (points route))
+            ++ [ end ]
 
 
 ascentBetween : Route -> Km -> Km -> Elevation

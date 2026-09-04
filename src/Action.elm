@@ -59,6 +59,8 @@ type RacingMsg
     | ToggleKmEntry
     | EditKmEntry String
     | SubmitKmEntry
+      -- Metres of course ahead that carry direction arrows, as typed.
+    | EditAhead String
     | ScrubProfile Float Float
       -- Pointer id, position in CSS pixels, and the map's width in CSS pixels.
     | MapPointerDown Int Pixel

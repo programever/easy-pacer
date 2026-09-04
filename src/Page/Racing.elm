@@ -76,6 +76,9 @@ update msg race model =
         EditKmEntry raw ->
             ( put { race | kmEntryText = raw } model, Cmd.none )
 
+        EditAhead raw ->
+            ( put { race | aheadText = raw } model, Cmd.none )
+
         SubmitKmEntry ->
             case String.toFloat race.kmEntryText of
                 Nothing ->
@@ -711,6 +714,7 @@ locatePanel race =
                     , view = race.map
                     , checkpoints = NonEmpty.toList (Plan.checkpoints race.plan)
                     , reached = Progress.km race.progress
+                    , ahead = State.lookahead race
                     , you = you race
                     , lost = currentState race == OffRoute
                     , uncertain = currentState race == Uncertain
@@ -720,7 +724,10 @@ locatePanel race =
                     }
                 ]
             , div [ class "map-foot" ]
-                [ div [ class "scale" ] [ text Map.gestureHint ]
+                [ div [ class "ahead" ]
+                    [ Html.label [ class "lbl" ] [ text "Mũi tên chỉ hướng (m phía trước)" ]
+                    , Form.numberField State.defaultAheadText race.aheadText (RacingChanged << EditAhead)
+                    ]
                 , Form.miniButton "Về vị trí tôi" (RacingChanged ViewMe)
                 , Form.miniButton "Toàn tuyến" (RacingChanged ViewWhole)
                 ]

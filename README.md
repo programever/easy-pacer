@@ -29,7 +29,17 @@ anywhere, and needs no account. It is served at
   cutoffs. The start time anchors the timeline; races that cross midnight or
   run into a second day read correctly.
 - During the race: the next checkpoint, how far, how much up and down, and
-  how long until it closes, plus the full ledger of every station.
+  how long until it closes, plus the full ledger of every station. The race
+  screen opens on the locate tab, the map, which is what a runner looks at
+  most.
+- The course map, drawn from the GPX with no tiles and no network. The part
+  behind the runner is grey and the part ahead is orange, both cut exactly at
+  the runner's km; where the course uses the same ground twice the part still
+  to run is drawn on top, wearing a grey edge so it still reads as ground
+  already covered once. Arrows along the stretch ahead of the runner show
+  which way the course is run, 500 m by default and adjustable, so a loop or
+  an out-and-back section reads unambiguously without arrows on the other pass
+  pointing the opposite way.
 - The elevation profile with a draggable cursor, mirrored on the course map.
 - GPS on demand only: one tap resolves your position onto the course,
   including out-and-back and looped sections, and tells you if you have left

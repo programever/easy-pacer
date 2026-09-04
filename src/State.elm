@@ -12,9 +12,11 @@ module State exposing
     , Tab(..)
     , Toast
     , Typing
+    , defaultAheadText
     , fitAll
     , fitTo
     , initialModel
+    , lookahead
     , noGesture
     , pointerDown
     , pointerMove
@@ -38,6 +40,7 @@ import Core.App.Plan as Plan exposing (Draft, Issue, Plan)
 import Core.App.Position exposing (Candidate)
 import Core.App.Progress exposing (Progress)
 import Core.App.Route as Route exposing (Route)
+import Core.Data.Distance as Distance exposing (Distance)
 import Core.Data.Duration as Duration exposing (Duration)
 import Core.Data.NonEmpty as NonEmpty exposing (NonEmpty)
 import Dict exposing (Dict)
@@ -106,6 +109,11 @@ type alias RaceState =
     , scrub : Scrub
     , kmEntryOpen : Bool
     , kmEntryText : String
+
+    -- Metres of course ahead of the runner that carry direction arrows on the
+    -- map, as typed. Raw text, so a half-typed number is not rewritten under
+    -- the runner's finger; `lookahead` is what the map reads.
+    , aheadText : String
 
     -- A GPS request is out and has not answered yet. Transient: not saved.
     , gpsPending : Bool
@@ -211,6 +219,38 @@ unexpired now toast =
 
     else
         Just toast
+
+
+{-| Half a kilometre: far enough to see the next turn on a loop, short enough
+that the arrows do not reach the other pass of an out-and-back and point both
+ways at once.
+-}
+defaultLookahead : Distance
+defaultLookahead =
+    Distance.fromMeters 500
+
+
+defaultAheadText : String
+defaultAheadText =
+    String.fromInt (Distance.inWholeMeters defaultLookahead)
+
+
+{-| How far ahead the map draws direction arrows. Blank or nonsense falls
+back to the default rather than to nothing, so clearing the box to retype
+does not blank the map; zero is honoured, for a runner who wants no arrows.
+-}
+lookahead : RaceState -> Distance
+lookahead race =
+    case String.toInt (String.trim race.aheadText) of
+        Just metres ->
+            if metres >= 0 then
+                Distance.fromMeters (Basics.toFloat metres)
+
+            else
+                defaultLookahead
+
+        Nothing ->
+            defaultLookahead
 
 
 noGesture : MapGesture

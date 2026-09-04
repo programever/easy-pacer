@@ -1,4 +1,4 @@
-module View.Map exposing (Config, You(..), gestureHint, unitsPerPixel, view)
+module View.Map exposing (Arrow, Config, You(..), arrowsAlong, unitsPerPixel, view)
 
 {-| The course drawn straight from the GPX, with no map tiles and no library.
 
@@ -13,8 +13,7 @@ import Core.App.Km as Km exposing (Km)
 import Core.App.LatLon as LatLon exposing (LatLon, Plane)
 import Core.App.Progress exposing (Fix)
 import Core.App.Route as Route exposing (Route)
-import Core.Data.Distance as Distance
-import Core.Data.NonEmpty as NonEmpty
+import Core.Data.Distance as Distance exposing (Distance)
 import Html exposing (Attribute)
 import State exposing (MapView)
 import Svg exposing (Svg)
@@ -27,6 +26,9 @@ type alias Config =
     , view : MapView
     , checkpoints : List Checkpoint
     , reached : Km
+
+    -- How far past `reached` the course carries direction arrows.
+    , ahead : Distance
     , you : You
     , lost : Bool
     , uncertain : Bool
@@ -57,6 +59,15 @@ height =
     300
 
 
+{-| Screen distance between two direction arrows, in SVG units. Spaced on the
+screen rather than along the course, so zooming in reveals more arrows instead
+of stretching the same few apart.
+-}
+arrowSpacing : Float
+arrowSpacing =
+    44
+
+
 view : List (Attribute msg) -> Config -> Svg msg
 view attributes config =
     let
@@ -68,22 +79,28 @@ view attributes config =
         project position =
             toScreen (LatLon.project (Route.projection config.route) position)
 
-        allPoints =
-            NonEmpty.toList (Route.points config.route)
+        onScreen =
+            List.map (.plane >> toScreen)
+
+        -- Behind the runner, then ahead on top, both cut exactly at the
+        -- runner's km. Where the course uses the same ground twice the part
+        -- still to run must win, so it is drawn last; the grey underneath is
+        -- wider than the orange, so shared ground shows orange with a grey
+        -- edge, and a glance still says it has been run once already.
+        behind =
+            Route.slice config.route Km.start config.reached
+
+        ahead =
+            Route.slice config.route config.reached (Route.totalKm config.route)
     in
     Svg.svg
         (SvgAttr.viewBox ("0 0 " ++ String.fromFloat width ++ " " ++ String.fromFloat height)
             :: attributes
         )
         (List.concat
-            [ [ line (List.map (.plane >> toScreen) allPoints) Theme.routeColour "2.6" ]
-            , [ line
-                    (List.filter (\point -> Km.isAtOrBefore config.reached point.km) allPoints
-                        |> List.map (.plane >> toScreen)
-                    )
-                    Theme.passedColour
-                    "2.6"
-              ]
+            [ [ line (onScreen behind) Theme.passedColour "5" ]
+            , [ line (onScreen ahead) Theme.routeColour "2.6" ]
+            , List.map directionArrow (arrowsAlong (onScreen (stretchAhead config)))
             , List.map (checkpointDot config project) config.checkpoints
             , List.map (breadcrumb project) config.breadcrumbs
             , backToRoute config project
@@ -118,6 +135,100 @@ line screenPoints colour thickness =
         , SvgAttr.strokeWidth thickness
         , SvgAttr.strokeLinejoin "round"
         , SvgAttr.strokeLinecap "round"
+        ]
+        []
+
+
+{-| A point on the screen and the direction the course runs through it, in
+degrees clockwise from screen-right.
+-}
+type alias Arrow =
+    { x : Float, y : Float, angle : Float }
+
+
+{-| The piece of course that carries direction arrows: from the runner forward
+for `ahead`. Arrows on the whole course would point both ways at once wherever
+an out-and-back passes itself, which is exactly where the runner needs a
+single answer.
+-}
+stretchAhead : Config -> List Route.Point
+stretchAhead config =
+    Route.slice config.route config.reached (Km.advance config.ahead config.reached)
+
+
+{-| Where to draw the arrows that say which way the course is run. On a loop or
+an out-and-back the line alone does not say, and the place the runner most
+needs to know is exactly the junction where two passes meet.
+
+Walks the drawn line in screen units, dropping an arrow every `arrowSpacing`,
+each turned to follow its own segment. Arrows off the visible canvas are left
+out, so a zoomed-in map only pays for what it shows.
+
+-}
+arrowsAlong : List { x : Float, y : Float } -> List Arrow
+arrowsAlong screenPoints =
+    List.map2 Tuple.pair screenPoints (List.drop 1 screenPoints)
+        |> List.foldl placeAlong ( arrowSpacing / 2, [] )
+        |> Tuple.second
+        |> List.filter onCanvas
+        |> List.reverse
+
+
+{-| Newest-first; `arrowsAlong` reverses at the end. `untilNext` is how much
+of the screen distance to the next arrow is still to be walked.
+-}
+placeAlong : ( { x : Float, y : Float }, { x : Float, y : Float } ) -> ( Float, List Arrow ) -> ( Float, List Arrow )
+placeAlong ( from, to ) ( untilNext, acc ) =
+    let
+        dx =
+            to.x - from.x
+
+        dy =
+            to.y - from.y
+
+        segment =
+            sqrt ((dx * dx) + (dy * dy))
+    in
+    if segment <= 0 then
+        ( untilNext, acc )
+
+    else if untilNext > segment then
+        ( untilNext - segment, acc )
+
+    else
+        let
+            fraction =
+                untilNext / segment
+
+            arrow =
+                { x = from.x + (dx * fraction)
+                , y = from.y + (dy * fraction)
+                , angle = atan2 dy dx * 180 / pi
+                }
+        in
+        placeAlong ( { x = arrow.x, y = arrow.y }, to ) ( arrowSpacing, arrow :: acc )
+
+
+onCanvas : Arrow -> Bool
+onCanvas arrow =
+    arrow.x >= 0 && arrow.x <= width && arrow.y >= 0 && arrow.y <= height
+
+
+{-| A chevron in the paper colour, sitting on the route line and pointing along
+it. Its arms reach past the line onto the dark ground, so the V shape reads at
+a glance whether the line under it is the orange course or the grey passed part.
+-}
+directionArrow : Arrow -> Svg msg
+directionArrow arrow =
+    Svg.path
+        [ SvgAttr.d "M-3.5 -3.5 L1.5 0 L-3.5 3.5"
+        , SvgAttr.fill "none"
+        , SvgAttr.stroke "#EEF3F7"
+        , SvgAttr.strokeWidth "1.8"
+        , SvgAttr.strokeLinecap "round"
+        , SvgAttr.strokeLinejoin "round"
+        , SvgAttr.transform
+            ("translate(" ++ round1 arrow.x ++ " " ++ round1 arrow.y ++ ") rotate(" ++ round1 arrow.angle ++ ")")
         ]
         []
 
@@ -338,13 +449,6 @@ unitsPerPixel renderedWidth =
 
     else
         1
-
-
-{-| User facing.
--}
-gestureHint : String
-gestureHint =
-    "Kéo để đi, chụm 2 ngón để phóng"
 
 
 round1 : Float -> String
